@@ -2,7 +2,7 @@
 // свой боец двигается мгновенно (предсказание), чужой — плавно с небольшой задержкой.
 import { Predictor, SnapBuffer } from "./predict.js?v=2";
 
-const WORKER_URL = "wss://comedy-kombat.ВАШ-ПОДДОМЕН.workers.dev"; // ← вписать после деплоя воркера
+const WORKER_URL = "wss://comedy-kombat.lostbirdsoft.workers.dev"; // ← вписать после деплоя воркера
 const W = 900, H = 500, FLOOR = 432, FH = 142, FW = 54, INTERP_MS = 75;
 
 const tg = window.Telegram?.WebApp;
