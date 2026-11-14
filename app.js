@@ -13,7 +13,7 @@ const roomId = tg?.initDataUnsafe?.start_param || params.get("room") || "";
 const initData = tg?.initData || (params.get("dev") ? "dev:" + params.get("dev") : "");
 const $ = id => document.getElementById(id);
 const el = { status: $("status"), roomTag: $("roomTag"), resign: $("resignBtn"), wait: $("screenWait"), select: $("screenSelect"),
-  fight: $("screenFight"), grid: $("grid"), ready: $("readyBtn"), result: $("result"), rematch: $("rematchBtn"), gear: $("gearBtn") };
+  fight: $("screenFight"), grid: $("grid"), ready: $("readyBtn"), result: $("result"), rematch: $("rematchBtn"), sound: $("soundBtn") };
 const setStatus = t => { el.status.textContent = t; };
 if (!/^[a-zA-Z0-9_-]{1,50}$/.test(roomId)) { setStatus("Не вдалося визначити кімнату. Відкрийте запрошення з чату."); throw new Error("bad room"); }
 el.roomTag.textContent = roomId.slice(-6).toUpperCase();
@@ -113,9 +113,9 @@ el.rematch.onclick = async () => { try { await call("rematch"); } catch (e) { se
 el.resign.onclick = async () => { if (confirm("Здатися?")) { try { await call("resign"); } catch (e) { setStatus(e.message); } } };
 
 // ---------- Звук (синтез, без файлов; iOS: разблокировка по первому касанию) ----------
-const store = { get: (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
-let actx = null, soundOn = store.get("ck_sound", "1") !== "0", hapticOn = store.get("ck_haptic", "1") !== "0";
-let ctrlMode = store.get("ck_ctrl", "joystick") === "buttons" ? "buttons" : "joystick"; // по умолчанию джойстик
+let actx = null, soundOn = localStorage.getItem("ck_sound") !== "0";
+el.sound.textContent = soundOn ? "🔊" : "🔇";
+el.sound.onclick = () => { soundOn = !soundOn; localStorage.setItem("ck_sound", soundOn ? "1" : "0"); el.sound.textContent = soundOn ? "🔊" : "🔇"; unlockAudio(); };
 function unlockAudio() {
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
@@ -135,7 +135,7 @@ function snd(freq, type, dur, vol = .14, delay = 0) {
   } catch (e) {}
 }
 const laugh = () => [0, .12, .24, .36].forEach((d, i) => snd(420 - i * 40, "square", .09, .12, d));
-const haptic = (k = "medium") => { if (!hapticOn) return; try { tg?.HapticFeedback?.impactOccurred(k); } catch (e) {} };
+const haptic = (k = "medium") => { try { tg?.HapticFeedback?.impactOccurred(k); } catch (e) {} };
 
 // ---------- Бой: снимки, предсказание, эффекты ----------
 const cv = $("game"), c = cv.getContext("2d");
@@ -312,7 +312,7 @@ const held = { l: 0, r: 0, b: 0, d: 0 }; let lastSent = "";
 function sendHeld(force) { const s = JSON.stringify(held); if (force || s !== lastSent) { lastSent = s; sendFast({ action: "in", ...held }); } }
 const resendHeld = () => sendHeld(true);
 function setHold(k, v) { held[k] = v ? 1 : 0; sendHeld(); }
-function releaseAll() { held.l = held.r = held.b = held.d = 0; sendHeld(); joyReset(); document.querySelectorAll(".pb.on").forEach(b => b.classList.remove("on")); }
+function releaseAll() { held.l = held.r = held.b = held.d = 0; sendHeld(); document.querySelectorAll(".pb.on").forEach(b => b.classList.remove("on")); }
 function localAttack(a) { // мгновенная анимация удара до ответа сервера
   if (!snap || !imPlayer()) return;
   const f = snap.f[mySlotIdx()], cx = predCtx(snap);
@@ -345,46 +345,5 @@ addEventListener("keydown", e => { const k = KEYS[e.code]; if (!k || !imPlayer()
 addEventListener("keyup", e => { const k = KEYS[e.code]; if (k && k[0] === "h") setHold(k[1], 0); });
 addEventListener("blur", releaseAll);
 document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll(); });
-
-// ---------- Джойстик ----------
-// Круг слева: тянешь влево/вправо — идёшь, вверх — прыжок, вниз — присед. Диагонали работают (бег + прыжок).
-const joy = $("joy"), knob = $("joyKnob"); let joyId = null, jumpArmed = true;
-function applyHeld(l, r, d) { held.l = l ? 1 : 0; held.r = r ? 1 : 0; held.d = d ? 1 : 0; sendHeld(); }
-function joyReset() { joyId = null; jumpArmed = true; knob.style.transform = "translate(0px,0px)"; joy.classList.remove("active"); applyHeld(0, 0, 0); }
-function joyMove(e) {
-  const r = joy.getBoundingClientRect(), R = r.width / 2, maxR = R * 0.62;
-  const dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + R), dist = Math.hypot(dx, dy), k = dist > maxR ? maxR / dist : 1;
-  knob.style.transform = "translate(" + dx * k + "px," + dy * k + "px)";
-  const nx = dx / maxR, ny = dy / maxR;
-  const down = ny > 0.55 && ny > Math.abs(nx);                     // «в основном вниз» — присесть
-  applyHeld(nx < -0.3, nx > 0.3, down);
-  if (ny < -0.6) { if (jumpArmed) { jumpArmed = false; doAct("jump"); } } else if (ny > -0.3) jumpArmed = true; // прыжок один раз за выброс вверх
-}
-joy.addEventListener("pointerdown", e => { e.preventDefault(); if (joyId !== null) return; joyId = e.pointerId; joy.classList.add("active"); try { joy.setPointerCapture(e.pointerId); } catch (x) {} joyMove(e); });
-joy.addEventListener("pointermove", e => { if (e.pointerId === joyId) { e.preventDefault(); joyMove(e); } });
-const joyEnd = e => { if (e.pointerId === joyId) joyReset(); };
-joy.addEventListener("pointerup", joyEnd); joy.addEventListener("pointercancel", joyEnd); joy.addEventListener("lostpointercapture", joyEnd);
-joy.addEventListener("contextmenu", e => e.preventDefault());
-
-// ---------- Настройки (⚙️) ----------
-const settings = $("settings"), seg = [...document.querySelectorAll("#segControl button")];
-const NOTES = { joystick: "Тяни круг: влево/вправо — идти, вверх — прыжок, вниз — присесть. Диагональ вверх-вправо — прыжок вперёд.", buttons: "Классическая крестовина: ◀ ▶ идти, ▲ прыжок, ▼ присесть." };
-function applyControl() {
-  releaseAll();
-  $("joy").hidden = ctrlMode !== "joystick"; $("dpad").hidden = ctrlMode !== "buttons";
-  seg.forEach(b => b.classList.toggle("sel", b.dataset.v === ctrlMode)); $("ctrlNote").textContent = NOTES[ctrlMode];
-}
-function paintToggles() {
-  const s = $("togSound"), h = $("togHaptic");
-  s.textContent = soundOn ? "УВІМК" : "ВИМК"; s.classList.toggle("on", soundOn);
-  h.textContent = hapticOn ? "УВІМК" : "ВИМК"; h.classList.toggle("on", hapticOn);
-}
-seg.forEach(b => { b.onclick = () => { ctrlMode = b.dataset.v; store.set("ck_ctrl", ctrlMode); applyControl(); }; });
-$("togSound").onclick = () => { soundOn = !soundOn; store.set("ck_sound", soundOn ? "1" : "0"); paintToggles(); unlockAudio(); if (soundOn) snd(440, "triangle", .12, .12); };
-$("togHaptic").onclick = () => { hapticOn = !hapticOn; store.set("ck_haptic", hapticOn ? "1" : "0"); paintToggles(); if (hapticOn) haptic("medium"); };
-el.gear.onclick = () => { releaseAll(); settings.hidden = false; };
-$("settingsClose").onclick = () => { settings.hidden = true; };
-settings.addEventListener("pointerdown", e => { if (e.target === settings) settings.hidden = true; });
-applyControl(); paintToggles();
 
 connect();
