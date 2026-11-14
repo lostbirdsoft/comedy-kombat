@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0c0a12">
+  <title>Comedy Kombat</title>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script type="module" src="app.js?v=2"></script>
+</head>
+<body>
+<main class="app">
+  <header class="topbar">
+    <div><div class="eyebrow">LOSTBIRD SOFT</div><h1>COMEDY <span>KOMBAT</span></h1></div>
+    <div class="topright"><span class="room-tag" id="roomTag">КІМНАТА</span><button id="soundBtn" class="mini ghost">🔊</button><button id="resignBtn" class="mini" hidden>Здатися</button></div>
+  </header>
+
+  <p id="status" class="status" role="status">Підключаємось…</p>
+
+  <section id="screenWait" class="screen"><div class="wait">🎤<br>Чекаємо другого бійця…<br><small>Надішли друзям кнопку з чату</small></div></section>
+
+  <section id="screenSelect" class="screen" hidden>
+    <div class="preview">
+      <canvas id="prevCanvas" width="170" height="190"></canvas>
+      <div class="prev-info">
+        <div class="camp-tag" id="prevCamp"></div>
+        <h2 id="prevName">Обери бійця</h2>
+        <div class="muted" id="prevTitle"></div>
+        <div class="special" id="prevSpecial"></div>
+        <div class="taunt" id="prevTaunt"></div>
+      </div>
+    </div>
+    <div id="grid" class="grid"></div>
+    <div class="vs" id="vsLine"></div>
+    <button id="readyBtn" class="big" disabled>ОБРАТИ БІЙЦЯ</button>
+    <p class="hint">▼ + 🎤 — апперкот · ▼ + 🦶 — підсічка · 🦶/🎤 у стрибку — удар зверху · пригнувшись, ухиляєшся від високих снарядів</p>
+  </section>
+
+  <section id="screenFight" class="screen" hidden>
+    <div class="stage"><canvas id="game" width="900" height="500"></canvas>
+      <div id="result" class="result" hidden>
+        <div class="res-title" id="resTitle"></div><div class="res-sub" id="resSub"></div>
+        <button id="rematchBtn" class="big">РЕВАНШ</button>
+      </div>
+    </div>
+    <div class="controls" id="controls">
+      <div class="dpad">
+        <button class="pb up" data-do="jump">▲</button>
+        <button class="pb lf" data-hold="l">◀</button>
+        <button class="pb dn" data-hold="d">▼</button>
+        <button class="pb rt" data-hold="r">▶</button>
+      </div>
+      <div class="acts">
+        <button class="pb punch" data-do="punch">🎤<small>РУКА</small></button>
+        <button class="pb kick" data-do="kick">🦶<small>НОГА</small></button>
+        <button class="pb blk" data-hold="b">🛡<small>БЛОК</small></button>
+        <button class="pb spec" data-do="special">✨<small id="specName">СПЕЦ</small></button>
+      </div>
+    </div>
+    <p class="hint">ПК: A/D — рух, W — стрибок, S — присісти, B/Shift — блок, F/G/H — рука/нога/спец</p>
+  </section>
+</main>
+</body>
+</html>
