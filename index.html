@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0c0a12">
   <title>Comedy Kombat</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" src="app.js?v=2"></script>
+  <script type="module" src="app.js?v=3"></script>
 </head>
 <body>
 <main class="app">
   <header class="topbar">
     <div><div class="eyebrow">LOSTBIRD SOFT</div><h1>COMEDY <span>KOMBAT</span></h1></div>
-    <div class="topright"><span class="room-tag" id="roomTag">КІМНАТА</span><button id="soundBtn" class="mini ghost">🔊</button><button id="resignBtn" class="mini" hidden>Здатися</button></div>
+    <div class="topright"><span class="room-tag" id="roomTag">КІМНАТА</span><button id="resignBtn" class="mini" hidden>Здатися</button><button id="gearBtn" class="mini ghost gear" aria-label="Налаштування">⚙️</button></div>
   </header>
 
   <p id="status" class="status" role="status">Підключаємось…</p>
@@ -45,7 +45,8 @@
       </div>
     </div>
     <div class="controls" id="controls">
-      <div class="dpad">
+      <div class="joy" id="joy" hidden><div class="joy-ring"></div><div class="joy-knob" id="joyKnob"></div></div>
+      <div class="dpad" id="dpad" hidden>
         <button class="pb up" data-do="jump">▲</button>
         <button class="pb lf" data-hold="l">◀</button>
         <button class="pb dn" data-hold="d">▼</button>
@@ -61,5 +62,21 @@
     <p class="hint">ПК: A/D — рух, W — стрибок, S — присісти, B/Shift — блок, F/G/H — рука/нога/спец</p>
   </section>
 </main>
+
+<div id="settings" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><b>Налаштування</b><button id="settingsClose" class="mini ghost" aria-label="Закрити">✕</button></div>
+    <div class="opt">
+      <div class="opt-title">Керування</div>
+      <div class="seg" id="segControl">
+        <button data-v="joystick">🕹 Джойстик</button>
+        <button data-v="buttons">⬅➡ Кнопки</button>
+      </div>
+      <div class="opt-note" id="ctrlNote"></div>
+    </div>
+    <div class="opt row"><span>Звук</span><button class="tog" id="togSound"></button></div>
+    <div class="opt row"><span>Вібрація при ударах</span><button class="tog" id="togHaptic"></button></div>
+  </div>
+</div>
 </body>
 </html>
