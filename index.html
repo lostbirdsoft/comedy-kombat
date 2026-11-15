@@ -5,18 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0c0a12">
   <title>Comedy Kombat</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" src="app.js?v=7"></script>
+  <script type="module" src="app.js?v=8"></script>
 </head>
 <body>
 <main class="app">
   <header class="topbar">
     <div><div class="eyebrow">LOSTBIRD SOFT</div><h1>COMEDY <span>KOMBAT</span></h1></div>
-    <div class="topright"><span class="room-tag" id="roomTag">КІМНАТА</span><button id="resignBtn" class="mini" hidden>Здатися</button><button id="gearBtn" class="mini ghost gear" aria-label="Налаштування">⚙️</button></div>
+    <div class="topright"><button id="menuBtn" class="mini ghost" hidden>☰ Меню</button><span class="room-tag" id="roomTag">МЕНЮ</span><button id="resignBtn" class="mini" hidden>Здатися</button><button id="gearBtn" class="mini ghost gear" aria-label="Налаштування">⚙️</button></div>
   </header>
 
   <p id="status" class="status" role="status">Підключаємось…</p>
+
+  <section id="screenMenu" class="screen" hidden>
+    <div class="menu">
+      <div class="menu-hero">🎤🥊<div class="menu-tag">ПІДПІЛЬНИЙ vs БРОДЯЧИЙ</div></div>
+      <div id="menuMain">
+        <button class="menu-btn primary" id="btnBot"><span>🤖 ГРАТИ З КОМПʼЮТЕРОМ</span><small>Бої наодинці та тренування</small></button>
+        <button class="menu-btn" id="btnRooms" disabled><span>👥 КІМНАТИ</span><small>Скоро: створити кімнату, лобі, запрошення за посиланням</small></button>
+        <div class="menu-note">Грати з друзями: у групі з ботом напиши /fight</div>
+      </div>
+      <div id="menuLevels" hidden>
+        <div class="menu-sub">СКЛАДНІСТЬ</div>
+        <button class="menu-btn lvl" data-level="easy"><span>😎 ЛЕГКИЙ</span><small>Для розминки</small></button>
+        <button class="menu-btn lvl" data-level="normal"><span>🥊 СЕРЕДНІЙ</span><small>Чесний бій</small></button>
+        <button class="menu-btn lvl" data-level="hard"><span>🔥 ВАЖКИЙ</span><small>Блокує, ухиляється, контратакує</small></button>
+        <button class="menu-back" id="btnLevelsBack">← Назад</button>
+      </div>
+    </div>
+  </section>
 
   <section id="screenWait" class="screen"><div class="wait">🎤<br>Чекаємо другого бійця…<br><small>Надішли друзям кнопку з чату</small></div></section>
 
@@ -42,6 +60,7 @@
       <div id="result" class="result" hidden>
         <div class="res-title" id="resTitle"></div><div class="res-sub" id="resSub"></div>
         <button id="rematchBtn" class="big">РЕВАНШ</button>
+        <button id="menuBtn2" class="big alt">В МЕНЮ</button>
       </div>
     </div>
     <div class="controls" id="controls">
