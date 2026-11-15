@@ -1,8 +1,8 @@
-// COMEDY KOMBAT v0.3 — клиент Mini App. Рисует состояние от сервера (Cloudflare Worker),
+// COMEDY KOMBAT v0.4 — клиент Mini App. Рисует состояние от сервера (Cloudflare Worker),
 // свой боец двигается мгновенно (предсказание), чужой — плавно с небольшой задержкой.
 import { Predictor, SnapBuffer } from "./predict.js?v=2";
 
-const CLIENT_VERSION = "0.3.0";
+const CLIENT_VERSION = "0.4.0";
 const WORKER_URL = "wss://comedy-kombat.lostbirdsoft.workers.dev";
 const W = 900, H = 500, FLOOR = 432, FH = 142, FW = 54, INTERP_MS = 75;
 
@@ -10,7 +10,7 @@ const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); try { tg.disableVerticalSwipes?.(); tg.setHeaderColor?.("#0c0a12"); tg.setBackgroundColor?.("#0c0a12"); } catch (e) {} }
 const params = new URLSearchParams(location.search);
 const startRoom = tg?.initDataUnsafe?.start_param || params.get("room") || ""; // из приглашения; пусто — открыто из профиля бота → главное меню
-let roomId = "", botLevel = null;
+let roomId = "", botLevel = null, joinOpts = {};
 // Локальный тест без Telegram: ?room=room_test&dev=Імя (нужен ALLOW_DEV="1" на сервере)
 const initData = tg?.initData || (params.get("dev") ? "dev:" + params.get("dev") : "");
 const $ = id => document.getElementById(id);
@@ -18,7 +18,7 @@ const el = { status: $("status"), roomTag: $("roomTag"), resign: $("resignBtn"),
   fight: $("screenFight"), grid: $("grid"), ready: $("readyBtn"), result: $("result"), rematch: $("rematchBtn"), gear: $("gearBtn") };
 const setStatus = t => { el.status.textContent = t; };
 if (startRoom && !/^[a-zA-Z0-9_-]{1,50}$/.test(startRoom)) { setStatus("Не вдалося визначити кімнату. Відкрийте запрошення з чату."); throw new Error("bad room"); }
-el.menu = $("screenMenu");
+el.menu = $("screenMenu"); el.rooms = $("screenRooms");
 
 
 let me = { slot: 0, spectator: false }, roster = [], camps = {}, players = {}, lobby = null, snap = null, picked = null, pauseInfo = null;
@@ -50,12 +50,12 @@ function connect() {
   sock.onopen = async () => {
     opened = true;
     try {
-      const r = await call("join", { initData, level: botLevel });
-      attempts = 0;
+      const r = await call("join", { initData, level: botLevel, create: !!joinOpts.create, public: !!joinOpts.public });
+      attempts = 0; joinOpts = {};
       me = { slot: r.player, spectator: !!r.spectator }; roster = r.roster; camps = r.camps; players = r.players;
       buildGrid(); setStatus(me.spectator ? "Ви спостерігач 👀" : "Ви — гравець " + me.slot);
       resendHeld(); render();
-    } catch (e) { setStatus(e.message); }
+    } catch (e) { if (e.code === "not_found") { stopConnection(); showRooms(e.message); } else setStatus(e.message); }
   };
   sock.onmessage = ev => {
     if (ev.data === "pong") { if (pingSent) rtt = rtt * 0.7 + (performance.now() - pingSent) * 0.3; return; }
@@ -63,7 +63,7 @@ function connect() {
     if (m.type === "lobby") { lobby = m; players = m.players; if (m.status !== "active") pauseInfo = null; if (m.status === "select" || m.status === "waiting") snap = null; render(); }
     else if (m.type === "snap") onSnap(m);
     else if (m.type === "pause") pauseInfo = m.slot ? { slot: m.slot, left: m.left } : null;
-    else if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); m.ok ? p.resolve(m) : p.reject(new Error(m.error || "Помилка")); }
+    else if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); m.ok ? p.resolve(m) : p.reject(Object.assign(new Error(m.error || "Помилка"), { code: m.code })); }
   };
   let handled = false;
   const fail = code => { // ошибка, закрытие или зависание подключения — всё сводится к одному планировщику переподключения
@@ -82,14 +82,14 @@ function connect() {
 document.addEventListener("visibilitychange", () => { if (roomId && !document.hidden && (!ws || ws.readyState > 1)) { attempts = 0; connect(); } });
 
 // ---------- Экраны ----------
-const show = name => { for (const k of ["menu", "wait", "select", "fight"]) el[k].hidden = k !== name; };
+const show = name => { for (const k of ["menu", "rooms", "wait", "select", "fight"]) el[k].hidden = k !== name; };
 function render() {
   if (!roomId || !lobby || !roster.length) return;
   const st = lobby.status;
   $("menuBtn").hidden = st === "active" && imPlayer(); // посреди боя выйти можно только через «Здатися»
   try { st === "active" && imPlayer() ? tg?.enableClosingConfirmation?.() : tg?.disableClosingConfirmation?.(); } catch (e) {}
   el.resign.hidden = !(st === "active" && imPlayer());
-  if (st === "waiting") { show("wait"); return; }
+  if (st === "waiting") { show("wait"); updateShare(); return; }
   if (st === "select") { show("select"); renderSelect(); return; }
   show("fight");
   $("controls").hidden = !imPlayer() || st === "finished";
@@ -416,21 +416,29 @@ function resetState() {
   me = { slot: 0, spectator: false }; roster = []; players = {}; lobby = null; snap = null; picked = null; pauseInfo = null; localAtk = null;
   buf.b.length = 0; pred.reset(); parts.length = 0; lastRd = 0; lastPh = ""; el.result.hidden = true; releaseAll();
 }
-function stopConnection() { clearTimeout(reconnectTimer); const s = ws; ws = null; attempts = 0; pending.clear(); if (s) { try { s.close(); } catch (e) {} } }
+function sendLeave() { try { if (ws && ws.readyState === 1 && imPlayer()) ws.send(JSON.stringify({ action: "leave" })); } catch (e) {} } // освободить место (во время боя сервер откажет)
+function stopConnection() { clearTimeout(reconnectTimer); const s = ws; ws = null; attempts = 0; pending.clear(); if (s) setTimeout(() => { try { s.close(); } catch (e) {} }, 120); }
 function setBack(on) { try { if (tg?.BackButton) on ? tg.BackButton.show() : tg.BackButton.hide(); } catch (e) {} }
-function enterRoom(id, level) {
-  stopConnection(); resetState(); roomId = id; botLevel = level || null;
-  el.roomTag.textContent = id.startsWith("room_bot_") ? "VS КОМП" : id.slice(-6).toUpperCase();
-  $("menuBtn").hidden = false; el.resign.hidden = true; show("wait"); setBack(true); connect();
+function enterRoom(id, level, opts) {
+  stopConnection(); resetState(); roomId = id; botLevel = level || null; joinOpts = opts || {};
+  el.roomTag.textContent = id.startsWith("room_bot_") ? "VS КОМП" : id.startsWith("room_c_") ? "КОД " + id.slice(7) : id.slice(-6).toUpperCase();
+  $("menuBtn").hidden = false; el.resign.hidden = true; show("wait"); updateShare(); setBack(true); connect();
 }
 function showMenu() {
-  stopConnection(); resetState(); roomId = ""; botLevel = null;
+  sendLeave(); stopConnection(); resetState(); roomId = ""; botLevel = null; clearInterval(lobbyTimer);
   $("menuMain").hidden = false; $("menuLevels").hidden = true; show("menu");
   $("menuBtn").hidden = true; el.resign.hidden = true; el.roomTag.textContent = "МЕНЮ"; setStatus("Обери режим"); setBack(false);
   try { tg?.disableClosingConfirmation?.(); } catch (e) {}
 }
-function leaveToMenu() {
-  if (lobby && lobby.status === "active" && imPlayer()) { if (!confirm("Здатися і вийти в меню?")) return; call("resign").catch(() => {}); }
+function showRooms(msg) {
+  sendLeave(); stopConnection(); resetState(); roomId = ""; botLevel = null;
+  show("rooms"); $("menuBtn").hidden = true; el.resign.hidden = true; el.roomTag.textContent = "КІМНАТИ"; setBack(true);
+  setStatus(msg || "Створи кімнату, введи код або обери з лобі"); loadLobby(); startLobbyPoll();
+  try { tg?.disableClosingConfirmation?.(); } catch (e) {}
+}
+async function leaveToMenu() {
+  if (!roomId) { showMenu(); return; } // экран «Кімнати» → назад в меню
+  if (lobby && lobby.status === "active" && imPlayer()) { if (!confirm("Здатися і вийти в меню?")) return; try { await call("resign"); } catch (e) {} }
   showMenu();
 }
 const newId = () => { const a = new Uint8Array(8); try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < 8; i++) a[i] = Math.random() * 256; } return Array.from(a, b => b.toString(36).padStart(2, "0")).join("").slice(0, 12); };
@@ -439,5 +447,59 @@ $("btnLevelsBack").onclick = () => { $("menuMain").hidden = false; $("menuLevels
 document.querySelectorAll(".lvl").forEach(b => { b.onclick = () => enterRoom("room_bot_" + newId(), b.dataset.level); });
 $("menuBtn").onclick = leaveToMenu; $("menuBtn2").onclick = showMenu;
 try { tg?.BackButton?.onClick(leaveToMenu); } catch (e) {}
+
+// ---------- Кімнати: создать, войти по коду, лобби ----------
+const HTTP_BASE = WORKER_URL.replace(/^ws/, "http").replace(/\/$/, "");
+const CODE_AL = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // без 0/O, 1/I/L — чтобы код не путали при диктовке
+const cleanCode = t => [...String(t).toUpperCase()].filter(ch => CODE_AL.includes(ch)).join("").slice(0, 5);
+function newCode() { const a = new Uint8Array(5); try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < 5; i++) a[i] = Math.random() * 256; } return Array.from(a, b => CODE_AL[b % CODE_AL.length]).join(""); }
+function createRoom(pub) { enterRoom("room_c_" + newCode(), null, { create: true, public: pub }); }
+function joinByCode() {
+  const code = cleanCode($("codeInput").value);
+  if (code.length !== 5) { setStatus("Код має 5 символів (літери та цифри, без 0, 1, O, I, L)."); return; }
+  enterRoom("room_c_" + code);
+}
+function updateShare() { // на экране ожидания в своей комнате показываем код и кнопки «скопировать / отправить»
+  const custom = roomId.startsWith("room_c_");
+  $("roomShare").hidden = !custom; $("waitHint").textContent = custom ? "Надішли код або запрошення другові" : "Надішли друзям кнопку з чату";
+  if (custom) $("roomCode").textContent = roomId.slice(7);
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+  try { const ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); document.body.removeChild(ta); return ok; } catch (e) { return false; }
+}
+let botName; async function getBot() { if (botName !== undefined) return botName; try { const j = await (await fetch(HTTP_BASE + "/info")).json(); botName = j.bot || null; } catch (e) { botName = null; } return botName; }
+$("btnCopyCode").onclick = async () => { const code = roomId.slice(7), ok = await copyText(code); setStatus(ok ? "Код скопійовано ✓" : "Не вдалося скопіювати. Код: " + code); };
+$("btnShareLink").onclick = async () => {
+  const code = roomId.slice(7), bot = await getBot();
+  if (!bot) { const ok = await copyText(code); setStatus("Посилання зараз недоступне. " + (ok ? "Код скопійовано: " : "Код: ") + code); return; }
+  const link = "https://t.me/" + bot + "?startapp=" + roomId, text = "Зіграємо в Comedy Kombat? Код кімнати: " + code;
+  const url = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(text);
+  try { if (tg?.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank"); } catch (e) { await copyText(link); setStatus("Посилання скопійовано: " + link); }
+};
+const ago = sec => sec < 45 ? "щойно" : Math.round(sec / 60) + " хв тому";
+let lobbyTimer = null;
+function startLobbyPoll() { clearInterval(lobbyTimer); lobbyTimer = setInterval(() => { if (el.rooms.hidden) clearInterval(lobbyTimer); else loadLobby(); }, 5000); }
+async function loadLobby() {
+  const list = $("lobbyList"), note = t => { list.innerHTML = ""; const d = document.createElement("div"); d.className = "lobby-empty"; d.textContent = t; list.appendChild(d); };
+  try {
+    const j = await (await fetch(HTTP_BASE + "/lobby", { cache: "no-store" })).json();
+    if (el.rooms.hidden) return;
+    if (!j.rooms.length) { note("Поки нікого. Створи відкриту кімнату, і вона зʼявиться тут."); return; }
+    list.innerHTML = "";
+    j.rooms.forEach(rm => {
+      const row = document.createElement("div"); row.className = "lobby-row";
+      const info = document.createElement("div"), b = document.createElement("b"), sm = document.createElement("small");
+      b.textContent = "🎤 " + rm.host; sm.textContent = "код " + rm.code + " · " + ago(rm.age); info.appendChild(b); info.appendChild(sm);
+      const go = document.createElement("button"); go.className = "lobby-go"; go.textContent = "У БІЙ";
+      row.appendChild(info); row.appendChild(go); row.onclick = () => enterRoom(rm.id); list.appendChild(row);
+    });
+  } catch (e) { if (!el.rooms.hidden) note("Не вдалося завантажити лобі. Спробуй ще раз."); }
+}
+$("btnRooms").onclick = () => showRooms();
+$("btnCreatePublic").onclick = () => createRoom(true); $("btnCreatePrivate").onclick = () => createRoom(false);
+$("btnJoinCode").onclick = joinByCode; $("btnRoomsBack").onclick = showMenu; $("btnLobbyRefresh").onclick = loadLobby;
+$("codeInput").oninput = () => { $("codeInput").value = cleanCode($("codeInput").value); };
+$("codeInput").onkeydown = e => { if (e.key === "Enter") joinByCode(); };
 
 if (startRoom) enterRoom(startRoom); else showMenu();

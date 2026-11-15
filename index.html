@@ -23,7 +23,7 @@
       <div class="menu-hero">🎤🥊<div class="menu-tag">ПІДПІЛЬНИЙ vs БРОДЯЧИЙ</div></div>
       <div id="menuMain">
         <button class="menu-btn primary" id="btnBot"><span>🤖 ГРАТИ З КОМПʼЮТЕРОМ</span><small>Бої наодинці та тренування</small></button>
-        <button class="menu-btn" id="btnRooms" disabled><span>👥 КІМНАТИ</span><small>Скоро: створити кімнату, лобі, запрошення за посиланням</small></button>
+        <button class="menu-btn" id="btnRooms"><span>👥 КІМНАТИ</span><small>Створити кімнату, ввести код, лобі</small></button>
         <div class="menu-note">Грати з друзями: у групі з ботом напиши /fight</div>
       </div>
       <div id="menuLevels" hidden>
@@ -36,7 +36,33 @@
     </div>
   </section>
 
-  <section id="screenWait" class="screen"><div class="wait">🎤<br>Чекаємо другого бійця…<br><small>Надішли друзям кнопку з чату</small></div></section>
+  <section id="screenRooms" class="screen" hidden>
+    <div class="menu">
+      <div class="menu-sub">СТВОРИТИ КІМНАТУ</div>
+      <div class="two">
+        <button class="menu-btn" id="btnCreatePublic"><span>🌐 ВІДКРИТА</span><small>Видно в лобі</small></button>
+        <button class="menu-btn" id="btnCreatePrivate"><span>🔒 ЗАКРИТА</span><small>Лише за кодом</small></button>
+      </div>
+      <div class="menu-sub">УВІЙТИ ЗА КОДОМ</div>
+      <div class="code-row">
+        <input id="codeInput" class="code-input" maxlength="5" placeholder="КОД" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="menu-btn code-go" id="btnJoinCode"><span>УВІЙТИ</span></button>
+      </div>
+      <div class="menu-sub lobby-head">ЛОБІ <button id="btnLobbyRefresh" class="mini ghost">↻</button></div>
+      <div id="lobbyList" class="lobby-list"></div>
+      <button class="menu-back" id="btnRoomsBack">← Назад</button>
+    </div>
+  </section>
+
+  <section id="screenWait" class="screen">
+    <div class="wait">🎤<br>Чекаємо другого бійця…<br><small id="waitHint">Надішли друзям кнопку з чату</small></div>
+    <div id="roomShare" class="share" hidden>
+      <div class="muted">Код кімнати</div>
+      <div class="code-big" id="roomCode">-----</div>
+      <button class="menu-btn" id="btnCopyCode"><span>📋 КОПІЮВАТИ КОД</span></button>
+      <button class="menu-btn primary" id="btnShareLink"><span>📨 НАДІСЛАТИ ЗАПРОШЕННЯ</span><small>Відкриє вибір чату в Telegram</small></button>
+    </div>
+  </section>
 
   <section id="screenSelect" class="screen" hidden>
     <div class="preview">
