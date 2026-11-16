@@ -1,8 +1,8 @@
-// COMEDY KOMBAT v0.4 — клиент Mini App. Рисует состояние от сервера (Cloudflare Worker),
+// COMEDY KOMBAT v0.5 — клиент Mini App. Рисует состояние от сервера (Cloudflare Worker),
 // свой боец двигается мгновенно (предсказание), чужой — плавно с небольшой задержкой.
 import { Predictor, SnapBuffer } from "./predict.js?v=2";
 
-const CLIENT_VERSION = "0.4.0";
+const CLIENT_VERSION = "0.5.0";
 const WORKER_URL = "wss://comedy-kombat.lostbirdsoft.workers.dev";
 const W = 900, H = 500, FLOOR = 432, FH = 142, FW = 54, INTERP_MS = 75;
 
@@ -10,15 +10,17 @@ const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); try { tg.disableVerticalSwipes?.(); tg.setHeaderColor?.("#0c0a12"); tg.setBackgroundColor?.("#0c0a12"); } catch (e) {} }
 const params = new URLSearchParams(location.search);
 const startRoom = tg?.initDataUnsafe?.start_param || params.get("room") || ""; // из приглашения; пусто — открыто из профиля бота → главное меню
-let roomId = "", botLevel = null, joinOpts = {};
+let roomId = "", botLevel = null, joinOpts = {}, pendingRoom = "", tsToken = "", tsWidget = null;
 // Локальный тест без Telegram: ?room=room_test&dev=Імя (нужен ALLOW_DEV="1" на сервере)
-const initData = tg?.initData || (params.get("dev") ? "dev:" + params.get("dev") : "");
+const isTg = !!tg && (!!tg.initData || (!!tg.platform && tg.platform !== "unknown")), devName = params.get("dev") || ""; // isTg — игра открыта внутри Telegram (в обычном браузере platform = "unknown")
+const isGuestMode = () => !isTg && !devName;                       // обычный браузер: входим как гость (ник + токен от сервера)
+function getInitData() { if (tg?.initData) return tg.initData; if (devName) return "dev:" + devName; const t = store.get("ck_guest", ""); return t ? "guest:" + t : ""; }
 const $ = id => document.getElementById(id);
 const el = { status: $("status"), roomTag: $("roomTag"), resign: $("resignBtn"), wait: $("screenWait"), select: $("screenSelect"),
   fight: $("screenFight"), grid: $("grid"), ready: $("readyBtn"), result: $("result"), rematch: $("rematchBtn"), gear: $("gearBtn") };
 const setStatus = t => { el.status.textContent = t; };
 if (startRoom && !/^[a-zA-Z0-9_-]{1,50}$/.test(startRoom)) { setStatus("Не вдалося визначити кімнату. Відкрийте запрошення з чату."); throw new Error("bad room"); }
-el.menu = $("screenMenu"); el.rooms = $("screenRooms");
+el.menu = $("screenMenu"); el.rooms = $("screenRooms"); el.guest = $("screenGuest");
 
 
 let me = { slot: 0, spectator: false }, roster = [], camps = {}, players = {}, lobby = null, snap = null, picked = null, pauseInfo = null;
@@ -50,12 +52,17 @@ function connect() {
   sock.onopen = async () => {
     opened = true;
     try {
-      const r = await call("join", { initData, level: botLevel, create: !!joinOpts.create, public: !!joinOpts.public });
+      const r = await call("join", { initData: getInitData(), level: botLevel, create: !!joinOpts.create, public: !!joinOpts.public });
       attempts = 0; joinOpts = {};
       me = { slot: r.player, spectator: !!r.spectator }; roster = r.roster; camps = r.camps; players = r.players;
       buildGrid(); setStatus(me.spectator ? "Ви спостерігач 👀" : "Ви — гравець " + me.slot);
       resendHeld(); render();
-    } catch (e) { if (e.code === "not_found") { stopConnection(); showRooms(e.message); } else setStatus(e.message); }
+    } catch (e) {
+      if (e.code === "not_found") { stopConnection(); showRooms(e.message); }
+      else if (e.code === "auth" && isGuestMode()) { stopConnection(); store.set("ck_guest", ""); pendingRoom = roomId.startsWith("room_bot_") ? "" : roomId; showGuest(e.message); } // токен гостя недійсний/застарів
+      else if (e.code === "rate_limited") { const bot = roomId.startsWith("room_bot_"); stopConnection(); if (bot) showMenu(); else showRooms(); setStatus(e.message); }
+      else setStatus(e.message);
+    }
   };
   sock.onmessage = ev => {
     if (ev.data === "pong") { if (pingSent) rtt = rtt * 0.7 + (performance.now() - pingSent) * 0.3; return; }
@@ -82,7 +89,7 @@ function connect() {
 document.addEventListener("visibilitychange", () => { if (roomId && !document.hidden && (!ws || ws.readyState > 1)) { attempts = 0; connect(); } });
 
 // ---------- Экраны ----------
-const show = name => { for (const k of ["menu", "rooms", "wait", "select", "fight"]) el[k].hidden = k !== name; };
+const show = name => { for (const k of ["guest", "menu", "rooms", "wait", "select", "fight"]) el[k].hidden = k !== name; };
 function render() {
   if (!roomId || !lobby || !roster.length) return;
   const st = lobby.status;
@@ -406,7 +413,7 @@ function paintToggles() {
 seg.forEach(b => { b.onclick = () => { ctrlMode = b.dataset.v; store.set("ck_ctrl", ctrlMode); applyControl(); }; });
 $("togSound").onclick = () => { soundOn = !soundOn; store.set("ck_sound", soundOn ? "1" : "0"); paintToggles(); unlockAudio(); if (soundOn) snd(440, "triangle", .12, .12); };
 $("togHaptic").onclick = () => { hapticOn = !hapticOn; store.set("ck_haptic", hapticOn ? "1" : "0"); paintToggles(); if (hapticOn) haptic("medium"); };
-el.gear.onclick = () => { releaseAll(); $("verNote").textContent = "Версія клієнта " + CLIENT_VERSION + (roomId ? " · кімната " + roomId.slice(-6).toUpperCase() : ""); settings.hidden = false; };
+el.gear.onclick = () => { releaseAll(); $("nickRow").hidden = !isGuestMode() || !!roomId; $("nickName").textContent = store.get("ck_guest_name", ""); $("verNote").textContent = "Версія клієнта " + CLIENT_VERSION + (roomId ? " · кімната " + roomId.slice(-6).toUpperCase() : ""); settings.hidden = false; };
 $("settingsClose").onclick = () => { settings.hidden = true; };
 settings.addEventListener("pointerdown", e => { if (e.target === settings) settings.hidden = true; });
 applyControl(); paintToggles();
@@ -427,6 +434,7 @@ function enterRoom(id, level, opts) {
 function showMenu() {
   sendLeave(); stopConnection(); resetState(); roomId = ""; botLevel = null; clearInterval(lobbyTimer);
   $("menuMain").hidden = false; $("menuLevels").hidden = true; show("menu");
+  $("menuWho").hidden = !isGuestMode(); $("menuWho").textContent = "👤 " + store.get("ck_guest_name", "");
   $("menuBtn").hidden = true; el.resign.hidden = true; el.roomTag.textContent = "МЕНЮ"; setStatus("Обери режим"); setBack(false);
   try { tg?.disableClosingConfirmation?.(); } catch (e) {}
 }
@@ -461,6 +469,9 @@ function joinByCode() {
 }
 function updateShare() { // на экране ожидания в своей комнате показываем код и кнопки «скопировать / отправить»
   const custom = roomId.startsWith("room_c_");
+  $("btnCopyWeb").hidden = !(custom && isTg);
+  $("shareLabel").textContent = isTg ? "📨 НАДІСЛАТИ ЗАПРОШЕННЯ" : "📨 ПОДІЛИТИСЬ ПОСИЛАННЯМ";
+  $("shareSub").textContent = isTg ? "Відкриє вибір чату в Telegram" : "Посилання відкриється в браузері друга";
   $("roomShare").hidden = !custom; $("waitHint").textContent = custom ? "Надішли код або запрошення другові" : "Надішли друзям кнопку з чату";
   if (custom) $("roomCode").textContent = roomId.slice(7);
 }
@@ -470,7 +481,14 @@ async function copyText(t) {
 }
 let botName; async function getBot() { if (botName !== undefined) return botName; try { const j = await (await fetch(HTTP_BASE + "/info")).json(); botName = j.bot || null; } catch (e) { botName = null; } return botName; }
 $("btnCopyCode").onclick = async () => { const code = roomId.slice(7), ok = await copyText(code); setStatus(ok ? "Код скопійовано ✓" : "Не вдалося скопіювати. Код: " + code); };
+const webLink = () => location.origin + location.pathname + "?room=" + roomId; // ссылка для браузера (без Telegram)
+$("btnCopyWeb").onclick = async () => { const l = webLink(), ok = await copyText(l); setStatus(ok ? "Посилання скопійовано ✓" : "Не вдалося скопіювати: " + l); };
 $("btnShareLink").onclick = async () => {
+  if (!isTg) { // браузер: системное меню «Поделиться» или копирование ссылки
+    const l = webLink(), t = "Зіграємо в Comedy Kombat? Код кімнати: " + roomId.slice(7);
+    try { if (navigator.share) { await navigator.share({ title: "Comedy Kombat", text: t, url: l }); return; } } catch (e) { if (e && e.name === "AbortError") return; }
+    const ok = await copyText(l); setStatus(ok ? "Посилання скопійовано ✓" : "Посилання: " + l); return;
+  }
   const code = roomId.slice(7), bot = await getBot();
   if (!bot) { const ok = await copyText(code); setStatus("Посилання зараз недоступне. " + (ok ? "Код скопійовано: " : "Код: ") + code); return; }
   const link = "https://t.me/" + bot + "?startapp=" + roomId, text = "Зіграємо в Comedy Kombat? Код кімнати: " + code;
@@ -502,4 +520,48 @@ $("btnJoinCode").onclick = joinByCode; $("btnRoomsBack").onclick = showMenu; $("
 $("codeInput").oninput = () => { $("codeInput").value = cleanCode($("codeInput").value); };
 $("codeInput").onkeydown = e => { if (e.key === "Enter") joinByCode(); };
 
-if (startRoom) enterRoom(startRoom); else showMenu();
+
+// ---------- Гостевой вход (без Telegram) ----------
+const cleanName = t => String(t).replace(/[^\p{L}\p{N} _.\-]/gu, "").replace(/\s+/g, " ").trim().slice(0, 20);
+function showGuest(msg) {
+  sendLeave(); stopConnection(); resetState(); roomId = ""; botLevel = null; clearInterval(lobbyTimer);
+  show("guest"); $("menuBtn").hidden = true; el.resign.hidden = true; el.roomTag.textContent = "ВХІД"; setBack(false);
+  $("guestName").value = store.get("ck_guest_name", ""); setStatus(msg || "Як тебе звати?"); setupCaptcha();
+}
+function afterLogin() { if (pendingRoom) { const r = pendingRoom; pendingRoom = ""; enterRoom(r); } else showMenu(); }
+function loadTurnstile() { return new Promise((res, rej) => { if (window.turnstile) return res(); const sc = document.createElement("script"); sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; sc.async = true; sc.onload = () => res(); sc.onerror = () => rej(new Error("turnstile")); document.head.appendChild(sc); }); }
+async function setupCaptcha() { // капча (Turnstile) включается на сервере; если ключа нет — ничего не показываем
+  const box = $("tsBox"); box.hidden = true; tsToken = ""; $("btnGuestGo").disabled = false;
+  if (store.get("ck_guest", "")) return; // уже есть личность: смена ника без капчи
+  let key = ""; try { key = (await (await fetch(HTTP_BASE + "/config")).json()).turnstileSiteKey || ""; } catch (e) { return; }
+  if (!key) return;
+  try { await loadTurnstile(); } catch (e) { setStatus("Не вдалося завантажити перевірку. Оновіть сторінку."); return; }
+  box.hidden = false; $("btnGuestGo").disabled = true;
+  if (tsWidget !== null) { window.turnstile.reset(tsWidget); return; }
+  tsWidget = window.turnstile.render(box, { sitekey: key, callback: t => { tsToken = t; $("btnGuestGo").disabled = false; }, "expired-callback": () => { tsToken = ""; $("btnGuestGo").disabled = true; }, "error-callback": () => setStatus("Помилка перевірки. Спробуйте ще раз.") });
+}
+async function guestLogin() {
+  const name = cleanName($("guestName").value), btn = $("btnGuestGo");
+  if (name.length < 2) { setStatus("Нікнейм: від 2 до 20 символів."); return; }
+  btn.disabled = true; setStatus("Входимо…");
+  try {
+    const r = await fetch(HTTP_BASE + "/guest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, token: store.get("ck_guest", ""), cf: tsToken }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { const err = new Error(j.error || "Не вдалося увійти. Спробуйте ще раз."); err.code = j.code; throw err; }
+    store.set("ck_guest", j.token); store.set("ck_guest_name", j.name); btn.disabled = false; afterLogin();
+  } catch (e) {
+    setStatus(e.message || "Немає зʼєднання з сервером.");
+    if (e.code === "captcha") { store.set("ck_guest", ""); setupCaptcha(); } else btn.disabled = false;
+  }
+}
+$("btnGuestGo").onclick = guestLogin;
+$("guestName").onkeydown = e => { if (e.key === "Enter") guestLogin(); };
+$("btnChangeNick").onclick = () => { settings.hidden = true; pendingRoom = ""; showGuest("Зміни нікнейм"); };
+
+function startApp() {
+  if (isGuestMode() && !store.get("ck_guest", "")) { pendingRoom = startRoom; showGuest(); return; } // без Telegram і без профілю — спершу нікнейм
+  if (startRoom) enterRoom(startRoom); else showMenu();
+}
+startApp();
+// Установка как приложения (только в обычном браузере; кэша нет, обновления приходят сразу)
+try { if ("serviceWorker" in navigator && !isTg && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {}); } catch (e) {}
