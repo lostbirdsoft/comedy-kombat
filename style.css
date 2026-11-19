@@ -100,3 +100,12 @@ input{user-select:text;-webkit-user-select:text}
 .name-input{flex:1;min-width:0;text-align:center;font:700 20px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;color:#fff;background:#120f1a;border:2px solid #3a3450;border-radius:14px;padding:13px 10px;outline:none}
 .name-input:focus{border-color:var(--gold)}
 .ts-box{display:flex;justify-content:center;margin-top:12px;min-height:65px}
+
+.arena-box{margin-top:12px}
+.arena-row{display:flex;gap:8px;overflow-x:auto;padding:6px 2px 8px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.arena-row::-webkit-scrollbar{display:none}
+.chip{flex:none;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:84px;padding:8px;border-radius:12px;border:2px solid #3a3450;background:#17141f;color:#ddd;font-size:11px;font-weight:700;text-align:center;line-height:1.15}
+.chip b{font-size:22px}
+.chip.sel{border-color:var(--gold);color:#fff;box-shadow:0 0 12px rgba(250,204,21,.3)}
+.chip:disabled{opacity:.65}
+.arena-desc{text-align:center;margin-top:2px;min-height:34px}

@@ -2,6 +2,7 @@
 // Идея: двигаем своего бойца сразу по тем же формулам, что на сервере, а при каждом снимке сервера
 // сверяемся: позиция сервера + то, что мы успели пройти за последний RTT, — и мягко подтягиваемся к ней.
 const FLOOR = 432, H = 142, W = 900, FW = 54, GRAV = 0.78;
+export const MAX_SEP = 746; // как в sim.js: дальше экрана от соперника отойти нельзя
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export class Predictor {
@@ -19,7 +20,8 @@ export class Predictor {
     const x0 = this.x;
     if (!c.busy && !held.b && !held.d) { if (held.r) this.vx = c.speed; else if (held.l) this.vx = -c.speed; }
     this.x += this.vx; this.vx *= 0.8;
-    this.x = clamp(this.x, 24, W - 24 - FW);
+    this.x = clamp(this.x, 24, (c.worldW || W) - 24 - FW);
+    if (c.oppX !== undefined) this.x = clamp(this.x, c.oppX - MAX_SEP, c.oppX + MAX_SEP);
     if (this.jumpState === "air") {
       this.y += this.vy;
       if (this.y + H < FLOOR) this.vy += GRAV; else { this.y = FLOOR - H; this.vy = 0; this.jumpState = "wait"; this.waitT = now; }
