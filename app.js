@@ -1,9 +1,18 @@
 // COMEDY KOMBAT v0.6 — клиент Mini App. Рисует состояние от сервера (Cloudflare Worker),
 // свой боец двигается мгновенно (предсказание), чужой — плавно с небольшой задержкой.
-import { Predictor, SnapBuffer } from "./predict.js?v=11";
-import { drawFighter } from "./fighter.js?v=11";
-import { DEFAULT_ARENA, makeState, loadArena, drawBack, drawFront, cameraTarget, stepCamera } from "./arena.js?v=11";
+import { Predictor, SnapBuffer } from "./predict.js?v=12";
+import { drawFighter } from "./fighter.js?v=12";
+import { DEFAULT_ARENA, makeState, loadArena, drawBack, drawFront, cameraTarget, stepCamera } from "./arena.js?v=12";
+import { SpriteBank, Animator, drawFighterSprite, drawStance } from "./sprites.js?v=12";
 const IMG_V = new URL(import.meta.url).searchParams.get("v") || "0"; // картинки арен кэшируются по тому же ?v=, что и сам app.js
+const banks = new Map(), anims = [new Animator(), new Animator()]; // спрайты бойцов (img/fighters/<id>/, см. SPRITES.md); нет файлов — рисуется процедурный боец
+const bankOf = id => { let b = banks.get(id); if (!b) { b = new SpriteBank(id, "img/fighters/", IMG_V); banks.set(id, b); } return b; };
+const WIN_PH = { ko: 1, finish: 1, fatality: 1, over: 1 };
+function drawAny(g, i, ch, views, now) { // спрайтами, если есть; иначе процедурный боец
+  const b = banks.get(ch.id), s = views[i], o = views[1 - i];
+  if (b && b.ready()) { const win = !!(snap && WIN_PH[snap.ph]) && !s.dd && (o.dd || s.hp > o.hp); if (drawFighterSprite(g, b, anims[i], ch, s, s.x, s.y, tick, { ch, ph: snap ? snap.ph : "", rd: snap ? snap.rd : 1, opp: o, winner: win }, now)) return; }
+  drawFighter(g, ch, s, s.x, s.y, tick);
+}
 
 const CLIENT_VERSION = "0.6.0";
 const WORKER_URL = "wss://comedy-kombat.lostbirdsoft.workers.dev";
@@ -59,7 +68,7 @@ function connect() {
       const r = await call("join", { initData: getInitData(), level: botLevel, create: !!joinOpts.create, public: !!joinOpts.public });
       attempts = 0; joinOpts = {};
       me = { slot: r.player, spectator: !!r.spectator }; roster = r.roster; camps = r.camps; arenas = r.arenas || []; players = r.players;
-      buildGrid(); buildArenaRow(); setStatus(me.spectator ? "Ви спостерігач 👀" : "Ви — гравець " + me.slot);
+      buildGrid(); buildArenaRow(); loadSprites(); setStatus(me.spectator ? "Ви спостерігач 👀" : "Ви — гравець " + me.slot);
       resendHeld(); render();
     } catch (e) {
       if (e.code === "not_found") { stopConnection(); showRooms(e.message); }
@@ -115,6 +124,9 @@ function render() {
     el.result.hidden = false; releaseAll();
   } else el.result.hidden = true;
 }
+function loadSprites() { // проба img/fighters/<id>/fighter.json у каждого бойца; когда что-то нашлось — перерисовать карточки
+  Promise.all(roster.map(ch => bankOf(ch.id).start())).then(r => { if (r.some(Boolean)) { buildGrid(); if (lobby && lobby.status === "select") renderSelect(); } });
+}
 function buildGrid() {
   el.grid.innerHTML = "";
   roster.forEach(ch => {
@@ -122,7 +134,7 @@ function buildGrid() {
     const c = document.createElement("canvas"); c.width = 60; c.height = 84; b.appendChild(c);
     const n = document.createElement("b"); n.textContent = ch.name; b.appendChild(n);
     b.onclick = () => pick(ch.id); el.grid.appendChild(b);
-    const g = c.getContext("2d"); g.scale(.5, .5); g.translate(3, 164 - FLOOR); drawFighter(g, ch, { fc: 1 }, 0, FLOOR - FH, 0);
+    const g = c.getContext("2d"); g.scale(.5, .5); g.translate(3, 164 - FLOOR); if (!drawStance(g, banks.get(ch.id), 0, FLOOR - FH)) drawFighter(g, ch, { fc: 1 }, 0, FLOOR - FH, 0);
   });
 }
 async function pick(id) {
@@ -150,7 +162,7 @@ function renderSelect() {
   const mine = (lobby.picks && lobby.picks[me.slot]) || picked, locked = lobby.locked && lobby.locked[me.slot], opp = me.slot === 1 ? 2 : 1;
   [...el.grid.children].forEach(b => { b.classList.toggle("sel", b.dataset.id === mine); b.classList.toggle("locked", !!locked && b.dataset.id !== mine); });
   const ch = byId(mine || ((lobby.picks && lobby.picks[1]) || roster[0].id));
-  const pc = $("prevCanvas").getContext("2d"); pc.clearRect(0, 0, 170, 190); pc.save(); pc.translate(58, 178 - FLOOR); drawFighter(pc, ch, { fc: 1 }, 0, FLOOR - FH, 0); pc.restore();
+  const pc = $("prevCanvas").getContext("2d"); pc.clearRect(0, 0, 170, 190); pc.save(); pc.translate(58, 178 - FLOOR); if (!drawStance(pc, banks.get(ch.id), 0, FLOOR - FH)) drawFighter(pc, ch, { fc: 1 }, 0, FLOOR - FH, 0); pc.restore();
   const camp = camps[ch.camp] || {};
   $("prevCamp").textContent = camp.name || ""; $("prevCamp").style.color = camp.color || "#fff";
   $("prevName").textContent = ch.name; $("prevTitle").textContent = ch.title;
@@ -286,7 +298,7 @@ function frame(nowT) {
   if (views) {
     c.save(); c.translate(-Math.round(cam), 0); // всё игровое рисуется в координатах мира
     snap.pr.forEach(drawProjectile);
-    for (let i = 0; i < 2; i++) { const ch = byId(lobby.chars[i]); if (ch) drawFighter(c, ch, views[i], views[i].x, views[i].y, tick); }
+    for (let i = 0; i < 2; i++) { const ch = byId(lobby.chars[i]); if (ch) drawAny(c, i, ch, views, nowT); }
     for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.x += p.vx; p.y += p.vy; p.vy += .32; if (--p.life <= 0) { parts.splice(i, 1); continue; } c.fillStyle = p.c; c.fillRect(p.x, p.y, p.s, p.s); }
     c.restore();
     drawFront(c, st, cam, tick); drawHUD(snap); // передний план поверх бойцов, затем интерфейс на экране
@@ -378,7 +390,7 @@ applyControl(); paintToggles();
 // ---------- Главное меню и вход в комнату ----------
 function resetState() {
   me = { slot: 0, spectator: false }; roster = []; players = {}; lobby = null; snap = null; picked = null; pauseInfo = null; localAtk = null;
-  buf.b.length = 0; pred.reset(); parts.length = 0; lastRd = 0; lastPh = ""; arenaSt = null; cam = 0; camSnap = true; el.result.hidden = true; releaseAll();
+  buf.b.length = 0; pred.reset(); parts.length = 0; lastRd = 0; lastPh = ""; arenaSt = null; cam = 0; camSnap = true; anims.forEach(a => a.reset()); el.result.hidden = true; releaseAll();
 }
 function sendLeave() { try { if (ws && ws.readyState === 1 && imPlayer()) ws.send(JSON.stringify({ action: "leave" })); } catch (e) {} } // освободить место (во время боя сервер откажет)
 function stopConnection() { clearTimeout(reconnectTimer); const s = ws; ws = null; attempts = 0; pending.clear(); if (s) setTimeout(() => { try { s.close(); } catch (e) {} }, 120); }

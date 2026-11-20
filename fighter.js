@@ -1,5 +1,5 @@
 // fighter.js — рисование бойца на canvas (тело, голова, удары, заморозка, горение). Вынесено из app.js, чтобы можно было тестировать кадры.
-const FLOOR = 432, FH = 142, FW = 54;
+export const FLOOR = 432, FH = 142, FW = 54;
 
 export function drawFighter(g, ch, s, x, y, t) {
   g.save();
@@ -49,14 +49,14 @@ export function drawFighter(g, ch, s, x, y, t) {
   if (s.fr) iceBlock(g, x - 6, y - 4, FW + 12, FH + 4);
   g.restore();
 }
-function flames(g, x, y, w, t, n) { // горение
+export function flames(g, x, y, w, t, n) { // горение
   for (let k = 0; k < n; k++) {
     const fx = x + (w / n) * (k + .5), base = y + 130 - ((k * 37 + t * 2.2) % 100), hh = 16 + 8 * Math.sin(t * .3 + k * 1.7);
     g.fillStyle = k % 2 ? "rgba(249,115,22,.85)" : "rgba(253,224,71,.85)";
     g.beginPath(); g.moveTo(fx - 7, base); g.quadraticCurveTo(fx, base - hh, fx + 2 * Math.sin(t * .4 + k), base - hh - 8); g.quadraticCurveTo(fx + 2, base - hh, fx + 7, base); g.fill();
   }
 }
-function iceBlock(g, x, y, w, h) { // заморозка: глыба, блик и сосульки
+export function iceBlock(g, x, y, w, h) { // заморозка: глыба, блик и сосульки
   g.fillStyle = "rgba(150,235,255,.55)"; g.strokeStyle = "#fff"; g.lineWidth = 2; g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h);
   g.fillStyle = "rgba(255,255,255,.55)"; g.beginPath(); g.moveTo(x + 6, y + h * .35); g.lineTo(x + 18, y + 6); g.lineTo(x + 26, y + 10); g.lineTo(x + 14, y + h * .45); g.fill();
   g.fillStyle = "rgba(200,245,255,.9)"; for (let k = 0; k < 4; k++) { const ix = x + 5 + k * (w - 10) / 4; g.beginPath(); g.moveTo(ix, y + h); g.lineTo(ix + 8, y + h); g.lineTo(ix + 4, y + h + 11); g.fill(); }
