@@ -1,7 +1,9 @@
 // fighter.js — рисование бойца на canvas (тело, голова, удары, заморозка, горение). Вынесено из app.js, чтобы можно было тестировать кадры.
 export const FLOOR = 432, FH = 142, FW = 54;
 
+const HEAVY_AS = { hpunch: "punch", hkick: "kick" }; // сильные удары рисуются как обычные (у них те же позы), отличается только длительность
 export function drawFighter(g, ch, s, x, y, t) {
+  if (HEAVY_AS[s.at]) s = Object.assign({}, s, { at: HEAVY_AS[s.at] });
   g.save();
   const fc = s.fc || 1, sp = ch.special, cx = x + 27;
   g.fillStyle = "rgba(0,0,0,.5)"; g.beginPath(); g.ellipse(cx, FLOOR, 35, 8, 0, 0, 6.283); g.fill();

@@ -1,8 +1,8 @@
 // sprites.js — СТАНДАРТ СПРАЙТОВ БОЙЦОВ (v0.7.0): каталог состояний, выбор состояния по снимку боя, загрузка полос кадров, рисование.
 // Единственный источник правды для игры, tools/sprites.mjs (заглушки, упаковка, проверка), sprite-viewer.html и SPRITES.md.
 // Нет картинок у бойца → игра рисует прежнего процедурного бойца (fighter.js); нет отдельного состояния → цепочка запасных (fb) → процедурный кадр.
-import { FLOOR, FH, FW, flames, iceBlock } from "./fighter.js?v=12";
-import { keyMagenta } from "./arena.js?v=12";
+import { FLOOR, FH, FW, flames, iceBlock } from "./fighter.js?v=13";
+import { keyMagenta } from "./arena.js?v=13";
 
 // ---------- геометрия стандарта ----------
 export const CELL = 192;            // клетка кадра, px (квадрат). Полоса состояния = N клеток в ряд: ширина CELL×N, высота CELL
@@ -68,11 +68,11 @@ export const STATES = [
   T("crouch_lk", "Crouch LK", "kicking", 3, 3, "once", 220, ["crouch_hk", "lk"]),
   T("crouch_hk", "Crouch HK", "kicking", 1, 5, "once", 430, ["lk", "stance_1"]),            // подсечка (sweep)
   T("crouch_hp", "Crouch HP", "punching", 1, 4, "once", 370, ["hp", "lp", "stance_1"]),     // апперкот (upper)
-  T("hp", "HP", "punching", 3, 4, "once", 300, ["lp"]),
+  T("hp", "HP", "punching", 1, 5, "once", 367, ["lp", "stance_1"]),
   T("lp", "LP", "punching", 1, 3, "once", 233, ["stance_1"]),                                // удар рукой (punch)
   T("close_p", "Close P", "combos", 2, 3, "once", 233, ["lp"]),
   T("lk", "LK", "kicking", 1, 4, "once", 333, ["lp", "stance_1"]),                     // удар ногой (kick)
-  T("hk", "HK", "kicking", 3, 5, "once", 400, ["lk"]),
+  T("hk", "HK", "kicking", 1, 5, "once", 500, ["lk", "stance_1"]),
   T("close_k", "Close K", "combos", 2, 4, "once", 333, ["lk"]),
   T("back_lk", "Back LK", "kicking", 3, 4, "once", 333, ["lk"]),
   T("back_hk", "Back HK", "kicking", 3, 5, "once", 400, ["hk", "lk"]),
@@ -155,7 +155,7 @@ export class Animator {
     else if (s.kd) id = "falling";
     else if (s.fr) id = "hit_high";
     else if (s.st && ctx.ph !== "finish") id = s.cr ? "crouch_hit" : "hit_high";
-    else if (s.at) id = s.at === "punch" ? (near ? "close_p" : "lp") : s.at === "kick" ? (near ? "close_k" : "lk") : s.at === "upper" ? "crouch_hp" : s.at === "sweep" ? "crouch_hk" : s.at === "air" ? "jump_k_1" : specialSlot(ctx.ch);
+    else if (s.at) id = s.at === "hpunch" ? "hp" : s.at === "hkick" ? "hk" : s.at === "punch" ? (near ? "close_p" : "lp") : s.at === "kick" ? (near ? "close_k" : "lk") : s.at === "upper" ? "crouch_hp" : s.at === "sweep" ? "crouch_hk" : s.at === "air" ? "jump_k_1" : specialSlot(ctx.ch);
     else if (air) id = this.mv ? "jump_2" : "jump_1";
     else if (s.cr) id = s.bl ? "crouch_block" : "crouch";
     else if (s.bl) id = "block";

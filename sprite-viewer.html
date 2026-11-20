@@ -24,7 +24,7 @@ button{cursor:pointer}.sum{color:#a3e635}.warn{color:#fca5a5}.muted{color:#9ca3a
 </div>
 <div id="sum" class="sum"></div><div id="msg" class="warn"></div><div id="out"></div>
 <script type="module">
-import { SpriteBank, STATES, CATEGORIES, STATE_BY_ID, frameIndex, effFps, CELL } from "./sprites.js?v=12";
+import { SpriteBank, STATES, CATEGORIES, STATE_BY_ID, frameIndex, effFps, CELL } from "./sprites.js?v=13";
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
 $("fid").value = q.get("f") || ""; let cards = [], bank = null;
 async function show() {

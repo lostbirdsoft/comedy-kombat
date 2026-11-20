@@ -1,9 +1,9 @@
 // COMEDY KOMBAT v0.6 — клиент Mini App. Рисует состояние от сервера (Cloudflare Worker),
 // свой боец двигается мгновенно (предсказание), чужой — плавно с небольшой задержкой.
-import { Predictor, SnapBuffer } from "./predict.js?v=12";
-import { drawFighter } from "./fighter.js?v=12";
-import { DEFAULT_ARENA, makeState, loadArena, drawBack, drawFront, cameraTarget, stepCamera } from "./arena.js?v=12";
-import { SpriteBank, Animator, drawFighterSprite, drawStance } from "./sprites.js?v=12";
+import { Predictor, SnapBuffer } from "./predict.js?v=13";
+import { drawFighter } from "./fighter.js?v=13";
+import { DEFAULT_ARENA, makeState, loadArena, drawBack, drawFront, cameraTarget, stepCamera } from "./arena.js?v=13";
+import { SpriteBank, Animator, drawFighterSprite, drawStance } from "./sprites.js?v=13";
 const IMG_V = new URL(import.meta.url).searchParams.get("v") || "0"; // картинки арен кэшируются по тому же ?v=, что и сам app.js
 const banks = new Map(), anims = [new Animator(), new Animator()]; // спрайты бойцов (img/fighters/<id>/, см. SPRITES.md); нет файлов — рисуется процедурный боец
 const bankOf = id => { let b = banks.get(id); if (!b) { b = new SpriteBank(id, "img/fighters/", IMG_V); banks.set(id, b); } return b; };
@@ -313,18 +313,18 @@ function sendHeld(force) { const s = JSON.stringify(held); if (force || s !== la
 const resendHeld = () => sendHeld(true);
 function setHold(k, v) { held[k] = v ? 1 : 0; sendHeld(); }
 function releaseAll() { held.l = held.r = held.b = held.d = 0; sendHeld(); joyReset(); document.querySelectorAll(".pb.on").forEach(b => b.classList.remove("on")); }
-function localAttack(a) { // мгновенная анимация удара до ответа сервера
+function localAttack(a) { // мгновенная анимация удара до ответа сервера (длительности как в sim.js: быстрые и сильные удары)
   if (!snap || !imPlayer()) return;
   const f = snap.f[mySlotIdx()], cx = predCtx(snap);
   if (!cx.free || held.b || localActive() || f.at) return;
-  const air = pred.y !== null && pred.y + FH < FLOOR - 2; let type = a, dur;
+  const air = pred.y !== null && pred.y + FH < FLOOR - 2, heavy = a === "hpunch" || a === "hkick", kick = a === "kick" || a === "hkick"; let type = a, dur;
   if (a === "special") { if (f.cd > 0) return; dur = 300; }
-  else if (air) { type = "air"; dur = 333; }
-  else if (held.d && a === "punch") { type = "upper"; dur = 367; }
-  else if (held.d && a === "kick") { type = "sweep"; dur = 433; }
-  else dur = a === "kick" ? 333 : 233;
+  else if (air) { type = "air"; dur = heavy ? 400 : 333; }
+  else if (held.d && !kick) { type = "upper"; dur = heavy ? 433 : 367; }
+  else if (held.d && kick) { type = "sweep"; dur = heavy ? 500 : 433; }
+  else dur = kick ? (heavy ? 500 : 333) : (heavy ? 367 : 233);
   localAtk = { type, until: performance.now() + dur };
-  snd(a === "special" ? 330 : 210, a === "special" ? "triangle" : "sine", a === "special" ? .22 : .08, .12);
+  snd(a === "special" ? 330 : heavy ? 150 : 210, a === "special" ? "triangle" : "sine", a === "special" ? .22 : heavy ? .1 : .08, .12);
 }
 function doAct(a) {
   if (a === "jump") { if (snap && imPlayer()) pred.jump(performance.now(), held, predCtx(snap)); }
@@ -340,7 +340,7 @@ document.querySelectorAll(".pb").forEach(b => {
 });
 const KEYS = { KeyA: ["h", "l"], ArrowLeft: ["h", "l"], KeyD: ["h", "r"], ArrowRight: ["h", "r"], KeyS: ["h", "d"], ArrowDown: ["h", "d"],
   KeyB: ["h", "b"], ShiftLeft: ["h", "b"], ShiftRight: ["h", "b"], KeyE: ["h", "b"],
-  KeyW: ["d", "jump"], ArrowUp: ["d", "jump"], Space: ["d", "jump"], KeyF: ["d", "punch"], KeyJ: ["d", "punch"], KeyG: ["d", "kick"], KeyK: ["d", "kick"], KeyH: ["d", "special"], KeyL: ["d", "special"] };
+  KeyW: ["d", "jump"], ArrowUp: ["d", "jump"], Space: ["d", "jump"], KeyF: ["d", "punch"], KeyJ: ["d", "punch"], KeyR: ["d", "hpunch"], KeyU: ["d", "hpunch"], KeyG: ["d", "kick"], KeyK: ["d", "kick"], KeyT: ["d", "hkick"], KeyI: ["d", "hkick"], KeyH: ["d", "special"], KeyL: ["d", "special"] }; // X/Y — рука (быстрая/сильная), A/B — нога, Z — спец, C — блок
 addEventListener("keydown", e => { const k = KEYS[e.code]; if (!k || !imPlayer()) return; e.preventDefault(); if (k[0] === "h") setHold(k[1], 1); else if (!e.repeat) doAct(k[1]); });
 addEventListener("keyup", e => { const k = KEYS[e.code]; if (k && k[0] === "h") setHold(k[1], 0); });
 addEventListener("blur", releaseAll);

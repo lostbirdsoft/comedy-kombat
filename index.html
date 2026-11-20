@@ -11,9 +11,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Comedy Kombat">
-  <link rel="stylesheet" href="style.css?v=14">
+  <link rel="stylesheet" href="style.css?v=13">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" src="app.js?v=14"></script>
+  <script type="module" src="app.js?v=13"></script>
 </head>
 <body>
 <main class="app">
@@ -104,7 +104,7 @@
     </div>
     <div class="vs" id="vsLine"></div>
     <button id="readyBtn" class="big" disabled>ОБРАТИ БІЙЦЯ</button>
-    <p class="hint">▼ + 🎤 — апперкот · ▼ + 🦶 — підсічка · 🦶/🎤 у стрибку — удар зверху · пригнувшись, ухиляєшся від високих снарядів</p>
+    <p class="hint">▼ + 👊 (X/Y) — апперкот · ▼ + 🦶 (A/B) — підсічка · 👊/🦶 у стрибку — удар зверху · Y і B — сильні удари: більше шкоди, довший замах · пригнувшись, ухиляєшся від високих снарядів</p>
   </section>
 
   <section id="screenFight" class="screen" hidden>
@@ -123,14 +123,16 @@
         <button class="pb dn" data-hold="d">▼</button>
         <button class="pb rt" data-hold="r">▶</button>
       </div>
-      <div class="acts">
-        <button class="pb punch" data-do="punch">🎤<small>РУКА</small></button>
-        <button class="pb kick" data-do="kick">🦶<small>НОГА</small></button>
-        <button class="pb blk" data-hold="b">🛡<small>БЛОК</small></button>
-        <button class="pb spec" data-do="special">✨<small id="specName">СПЕЦ</small></button>
+      <div class="acts six">
+        <button class="pb punch" data-do="punch"><i>X</i>👊<small>РУКА</small></button>
+        <button class="pb punch hv" data-do="hpunch"><i>Y</i>👊<small>СИЛЬНА</small></button>
+        <button class="pb spec" data-do="special"><i>Z</i>✨<small id="specName">СПЕЦ</small></button>
+        <button class="pb kick" data-do="kick"><i>A</i>🦶<small>НОГА</small></button>
+        <button class="pb kick hv" data-do="hkick"><i>B</i>🦶<small>СИЛЬНА</small></button>
+        <button class="pb blk" data-hold="b"><i>C</i>🛡<small>БЛОК</small></button>
       </div>
     </div>
-    <p class="hint">ПК: A/D — рух, W — стрибок, S — присісти, B/Shift — блок, F/G/H — рука/нога/спец</p>
+    <p class="hint">ПК: A/D — рух, W — стрибок, S — присісти, Shift/B — блок (C) · F/R — рука X/Y, G/T — нога A/B, H — спец (Z)</p>
   </section>
 </main>
 
