@@ -1,17 +1,21 @@
 // COMEDY KOMBAT v0.6 — клиент Mini App. Рисует состояние от сервера (Cloudflare Worker),
 // свой боец двигается мгновенно (предсказание), чужой — плавно с небольшой задержкой.
-import { Predictor, SnapBuffer } from "./predict.js?v=13";
-import { drawFighter } from "./fighter.js?v=13";
-import { DEFAULT_ARENA, makeState, loadArena, drawBack, drawFront, cameraTarget, stepCamera } from "./arena.js?v=13";
-import { SpriteBank, Animator, drawFighterSprite, drawStance } from "./sprites.js?v=13";
+import { Predictor, SnapBuffer } from "./predict.js?v=16";
+import { drawFighter } from "./fighter.js?v=16";
+import { DEFAULT_ARENA, makeState, loadArena, drawBack, drawFront, cameraTarget, stepCamera } from "./arena.js?v=16";
+import { SpriteBank, Animator, drawSpriteWant, drawStance } from "./sprites.js?v=16";
+import { rigHas, rigLen } from "./rig.js?v=16";
 const IMG_V = new URL(import.meta.url).searchParams.get("v") || "0"; // картинки арен кэшируются по тому же ?v=, что и сам app.js
 const banks = new Map(), anims = [new Animator(), new Animator()]; // спрайты бойцов (img/fighters/<id>/, см. SPRITES.md); нет файлов — рисуется процедурный боец
 const bankOf = id => { let b = banks.get(id); if (!b) { b = new SpriteBank(id, "img/fighters/", IMG_V); banks.set(id, b); } return b; };
 const WIN_PH = { ko: 1, finish: 1, fatality: 1, over: 1 };
-function drawAny(g, i, ch, views, now) { // спрайтами, если есть; иначе процедурный боец
-  const b = banks.get(ch.id), s = views[i], o = views[1 - i];
-  if (b && b.ready()) { const win = !!(snap && WIN_PH[snap.ph]) && !s.dd && (o.dd || s.hp > o.hp); if (drawFighterSprite(g, b, anims[i], ch, s, s.x, s.y, tick, { ch, ph: snap ? snap.ph : "", rd: snap ? snap.rd : 1, opp: o, winner: win }, now)) return; }
-  drawFighter(g, ch, s, s.x, s.y, tick);
+function drawAny(g, i, ch, views, now) { // спрайтами, если есть; иначе скелетным ригом (rig.js). Состояние считает один аниматор на слот
+  const b = banks.get(ch.id), s = views[i], o = views[1 - i], ready = !!(b && b.ready());
+  const win = !!(snap && WIN_PH[snap.ph]) && !s.dd && (o.dd || s.hp > o.hp);
+  const ctx = { ch, ph: snap ? snap.ph : "", rd: snap ? snap.rd : 1, opp: o, winner: win, has: id => ready ? b.has(id) && !!b.imgs[id] : rigHas(id) && id !== "turn", len: id => ready ? b.len(id) : rigLen(id) };
+  const want = anims[i].update(s, ctx, now);
+  if (ready && drawSpriteWant(g, b, want, ch, s, s.x, s.y, tick)) return;
+  drawFighter(g, ch, s, s.x, s.y, tick, want.id, want.ms, want.dir);
 }
 
 const CLIENT_VERSION = "0.6.0";

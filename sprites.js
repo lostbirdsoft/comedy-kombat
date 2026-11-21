@@ -1,13 +1,14 @@
 // sprites.js — СТАНДАРТ СПРАЙТОВ БОЙЦОВ (v0.7.0): каталог состояний, выбор состояния по снимку боя, загрузка полос кадров, рисование.
 // Единственный источник правды для игры, tools/sprites.mjs (заглушки, упаковка, проверка), sprite-viewer.html и SPRITES.md.
 // Нет картинок у бойца → игра рисует прежнего процедурного бойца (fighter.js); нет отдельного состояния → цепочка запасных (fb) → процедурный кадр.
-import { FLOOR, FH, FW, flames, iceBlock } from "./fighter.js?v=13";
-import { keyMagenta } from "./arena.js?v=13";
+import { FLOOR, FH, FW, drawStatus } from "./fighter.js?v=16";
+import { keyMagenta } from "./arena.js?v=16";
+export { drawStatus };
 
 // ---------- геометрия стандарта ----------
-export const CELL = 192;            // клетка кадра, px (квадрат). Полоса состояния = N клеток в ряд: ширина CELL×N, высота CELL
+export const CELL_W = 256, CELL_H = 224; // клетка кадра, px: 256×224 (запас вправо под удары: подсечка, сильная нога, молот; запас вверх под руки над головой и кувырок). Полоса состояния = N клеток в ряд: ширина 256×N, высота 224
 export const STAND_H = 160;         // высота бойца в стойке (макушка → пятки) в px клетки; игра масштабирует так, чтобы это = рост хитбокса (142)
-export const ANCHOR = [96, 180];    // точка пола: между стопами, центр по X, 180 из 192 по Y (12 px воздуха под ногами). Все кадры ставятся по ней
+export const ANCHOR = [96, 212];    // точка пола: между стопами; 96 px слева (хватает на лежачее тело), 160 px справа (удары), 212 из 224 по Y (12 px воздуха под ногами, 52 px над головой)
 export const FORMAT = 1;            // версия формата fighter.json
 // Рисунок смотрит ВПРАВО. Игра сама отражает бойца, когда он смотрит влево.
 
@@ -108,16 +109,17 @@ export const DEFAULT_SPECIAL = { projectile: "special_a", shockwave: "special_b"
 export const specialSlot = ch => { const sp = (ch && ch.special) || {}; return STATE_BY_ID[sp.sprite] ? sp.sprite : (DEFAULT_SPECIAL[sp.kind] || "special_a"); };
 
 // ---------- манифест fighter.json ----------
-// { "format":1, "cell":192, "anchor":[96,180], "stand":160, "scale":1, "pixel":false, "chroma":false, "ext":"png",
+// { "format":1, "cell":[256,224], "anchor":[96,212], "stand":160, "scale":1, "pixel":false, "chroma":false, "ext":"png",
 //   "states": { "stance_1": {"frames":6,"fps":8}, "lp": {"frames":3} } }   // frames обязателен, fps необязателен (иначе темп из каталога)
 export function validateManifest(m) {
   const errors = [], warnings = [];
   if (!m || typeof m !== "object" || Array.isArray(m)) return { ok: false, errors: ["fighter.json: ожидается объект"], warnings, manifest: null };
-  const cell = m.cell === undefined ? CELL : m.cell;
-  if (!Number.isInteger(cell) || cell < 32 || cell > 1024) errors.push("cell: целое 32..1024 (стандарт " + CELL + ")");
-  const anchor = m.anchor === undefined ? [Math.round(cell / 2), Math.round(cell * ANCHOR[1] / CELL)] : m.anchor;
+  const cell = m.cell === undefined ? [CELL_W, CELL_H] : Number.isInteger(m.cell) ? [m.cell, m.cell] : m.cell;
+  if (!Array.isArray(cell) || cell.length !== 2 || !cell.every(v => Number.isInteger(v) && v >= 32 && v <= 1024)) errors.push("cell: [ширина, высота] в px, 32..1024 (стандарт [" + CELL_W + "," + CELL_H + "])");
+  const okc = !errors.length;
+  const anchor = m.anchor === undefined ? (okc ? [Math.round(cell[0] * ANCHOR[0] / CELL_W), Math.round(cell[1] * ANCHOR[1] / CELL_H)] : ANCHOR) : m.anchor;
   if (!Array.isArray(anchor) || anchor.length !== 2 || !anchor.every(Number.isFinite)) errors.push("anchor: [x, y] в px клетки");
-  const stand = m.stand === undefined ? STAND_H * (Number.isInteger(cell) ? cell / CELL : 1) : m.stand;
+  const stand = m.stand === undefined ? STAND_H * (okc ? cell[1] / CELL_H : 1) : m.stand;
   if (!(stand > 0)) errors.push("stand: высота бойца в стойке, px (>0)");
   const scale = m.scale === undefined ? 1 : m.scale; if (!(scale > 0.2 && scale < 5)) errors.push("scale: 0.2..5");
   const ext = m.ext === undefined ? "png" : m.ext; if (ext !== "png" && ext !== "webp") errors.push("ext: png или webp");
@@ -145,10 +147,10 @@ export const stateMs = (id, n, override) => { const d = STATE_BY_ID[id]; return 
 // s — вид бойца {x,y,fc,cr,bl,at,fr,st,kd,bu,dd,hp}, ctx — {ch, ph, rd, opp, has(id), len(id)}; now — мс.
 export class Animator {
   constructor() { this.reset(); }
-  reset() { this.id = null; this.t0 = 0; this.px = null; this.pfc = 0; this.mv = 0; this.down = false; this.tr = null; }
+  reset() { this.id = null; this.t0 = 0; this.px = null; this.pfc = 0; this.mv = 0; this.down = false; this.tr = null; this.mdir = 1; }
   update(s, ctx, now) {
     const air = s.y + FH < FLOOR - 2, dx = this.px === null ? 0 : s.x - this.px; this.px = s.x;
-    if (Math.abs(dx) > 0.7) this.mv = 6; else if (this.mv > 0) this.mv--;            // гистерезис: не мигать между ходьбой и стойкой
+    if (Math.abs(dx) > 0.7) { this.mv = 6; this.mdir = dx * s.fc > 0 ? 1 : -1; } else if (this.mv > 0) this.mv--;            // гистерезис: не мигать между ходьбой и стойкой
     const fwd = dx * s.fc > 0, o = ctx.opp, near = o ? Math.abs(o.x - s.x) < FW + 34 : false;
     let id;
     if (s.dd) id = "faint";
@@ -168,8 +170,8 @@ export class Animator {
     this.down = !!s.kd; this.pfc = s.fc;
     if (this.tr && (now >= this.tr.until || s.dd || s.kd || s.at || s.st || air)) this.tr = null;
     if (this.tr && (id === "stance_1" || id === "walk" || id === "walk_back")) id = this.tr.id;
-    if (id !== this.id) { this.id = id; this.t0 = now; }
-    return { id, ms: now - this.t0 };
+    if (id !== this.id) { this.id = id; this.t0 = now; this.sdir = this.mdir; }
+    return { id, ms: now - this.t0, dir: this.sdir || 1 };
   }
 }
 
@@ -198,7 +200,7 @@ export class SpriteBank {
       if (im) this.imgs[id] = im; return im;
     });
   }
-  frames(id) { const d = this.man.states[id], im = this.imgs[id]; return im ? Math.max(1, Math.min(d.frames, Math.floor(im.width / this.man.cell))) : d.frames; }
+  frames(id) { const d = this.man.states[id], im = this.imgs[id]; return im ? Math.max(1, Math.min(d.frames, Math.floor(im.width / this.man.cell[0]))) : d.frames; }
   resolve(id) { // запрошенное состояние → первое существующее и уже загруженное по цепочке запасных (вглубь); null = рисовать заглушкой
     if (!this.man) return null;
     const seen = new Set(), walk = c => {
@@ -212,27 +214,26 @@ export class SpriteBank {
 }
 
 // ---------- рисование ----------
-export function drawStatus(g, s, x, y, t) { // заморозка, горение, звёздочки оглушения: поверх спрайта
-  const ly = y + FH - 28, lying = s.dd || s.kd;
-  if (s.st && !s.fr && !lying) { g.fillStyle = "#fde047"; for (let i = 0; i < 3; i++) { const a = t * .15 + i * 2.1; g.fillRect(x + 27 + Math.cos(a) * 16 - 2, y - 6 + Math.sin(a) * 4, 5, 5); } }
-  if (s.bu) lying ? flames(g, x - 10, ly - 10, 100, t, 3) : flames(g, x - 4, y, FW + 8, t, 6);
-  if (s.fr) lying ? iceBlock(g, x - 26, ly - 6, 120, 38) : iceBlock(g, x - 6, y - 4, FW + 12, FH + 4);
-}
 export function drawFrame(g, bank, id, frame, fc, x, y, alpha = 1) { // один кадр состояния: ноги на точке пола бойца, рисунок смотрит вправо
   const M = bank.man, im = bank.imgs[id]; if (!im) return false;
   const K = FH / M.stand * M.scale, cx = x + FW / 2, fy = y + FH;
   g.save(); g.translate(cx, fy); if (fc === -1) g.scale(-1, 1); g.globalAlpha = alpha; g.imageSmoothingEnabled = !M.pixel;
-  g.drawImage(im, frame * M.cell, 0, M.cell, M.cell, -M.anchor[0] * K, -M.anchor[1] * K, M.cell * K, M.cell * K); g.restore(); return true;
+  g.drawImage(im, frame * M.cell[0], 0, M.cell[0], M.cell[1], -M.anchor[0] * K, -M.anchor[1] * K, M.cell[0] * K, M.cell[1] * K); g.restore(); return true;
 }
-// Возвращает true, если боец нарисован спрайтом (иначе вызывающий рисует процедурного)
+// Рисует спрайтом по уже посчитанному состоянию want = {id, ms}. true — нарисован; false — вызывающий рисует ригом
+export function drawSpriteWant(g, bank, want, ch, s, x, y, t) {
+  if (!bank || !bank.ready()) return false;
+  const id = bank.resolve(want.id); if (!id) return false;
+  const n = bank.frames(id), d = STATE_BY_ID[id], fps = effFps(d, n, bank.man.states[id].fps), fi = frameIndex(d, n, want.ms, fps);
+  g.fillStyle = "rgba(0,0,0,.5)"; g.beginPath(); g.ellipse(x + FW / 2, FLOOR, 35, 8, 0, 0, 6.283); g.fill();
+  const tele = s.at === "special" && ch && ch.special && ch.special.kind === "teleport";
+  if (!drawFrame(g, bank, id, fi, s.fc || 1, x, y, tele ? .55 : 1)) return false;
+  drawStatus(g, s, x, y, t); return true;
+}
+// Совместимость: состояние + рисование спрайтом одним вызовом
 export function drawFighterSprite(g, bank, anim, ch, s, x, y, t, ctx, now) {
   if (!bank || !bank.ready()) return false;
   ctx.has = id => bank.has(id) && !!bank.imgs[id]; ctx.len = id => bank.len(id);
-  const want = anim.update(s, ctx, now), id = bank.resolve(want.id); if (!id) return false;
-  const n = bank.frames(id), d = STATE_BY_ID[id], fps = effFps(d, n, bank.man.states[id].fps), fi = frameIndex(d, n, want.ms, fps);
-  g.fillStyle = "rgba(0,0,0,.5)"; g.beginPath(); g.ellipse(x + FW / 2, FLOOR, 35, 8, 0, 0, 6.283); g.fill();
-  const tele = s.at === "special" && ctx.ch && ctx.ch.special && ctx.ch.special.kind === "teleport";
-  if (!drawFrame(g, bank, id, fi, s.fc || 1, x, y, tele ? .55 : 1)) return false;
-  drawStatus(g, s, x, y, t); return true;
+  return drawSpriteWant(g, bank, anim.update(s, ctx, now), ch, s, x, y, t);
 }
 export function drawStance(g, bank, x, y, fc = 1) { return !!(bank && bank.ready() && drawFrame(g, bank, "stance_1", 0, fc, x, y)); }

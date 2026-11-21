@@ -8,9 +8,9 @@ h1{font-size:18px;margin:0 0 8px}h2{font-size:15px;margin:22px 0 8px;color:#fbbf
 input,button,select{background:#262634;color:#fff;border:1px solid #444;border-radius:6px;padding:6px 10px;font:inherit}
 button{cursor:pointer}.sum{color:#a3e635}.warn{color:#fca5a5}.muted{color:#9ca3af}
 .grid{display:flex;flex-wrap:wrap;gap:10px}
-.card{width:152px;background:#1d1d29;border:1px solid #333;border-radius:8px;padding:6px;text-align:center}
+.card{width:200px;background:#1d1d29;border:1px solid #333;border-radius:8px;padding:6px;text-align:center}
 .card.miss{border-style:dashed;opacity:.55}
-.card canvas{width:144px;height:144px;background:repeating-conic-gradient(#2b2b3a 0 25%,#222230 0 50%) 0 0/16px 16px;border-radius:4px}
+.card canvas{width:192px;height:144px;background:repeating-conic-gradient(#2b2b3a 0 25%,#222230 0 50%) 0 0/16px 16px;border-radius:4px}
 .card b{display:block;font-size:12px}.card small{display:block;color:#9ca3af;font-size:11px;min-height:28px}
 .t1{color:#fbbf24}.t2{color:#7dd3fc}.t3{color:#9ca3af}
 </style></head><body>
@@ -24,7 +24,7 @@ button{cursor:pointer}.sum{color:#a3e635}.warn{color:#fca5a5}.muted{color:#9ca3a
 </div>
 <div id="sum" class="sum"></div><div id="msg" class="warn"></div><div id="out"></div>
 <script type="module">
-import { SpriteBank, STATES, CATEGORIES, STATE_BY_ID, frameIndex, effFps, CELL } from "./sprites.js?v=13";
+import { SpriteBank, STATES, CATEGORIES, STATE_BY_ID, frameIndex, effFps } from "./sprites.js?v=16";
 const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
 $("fid").value = q.get("f") || ""; let cards = [], bank = null;
 async function show() {
@@ -34,13 +34,13 @@ async function show() {
   if (!bank.man) { const is = bank.issues; $("msg").textContent = is && is.errors.length ? "fighter.json с ошибками: " + is.errors.join("; ") : "Нет img/fighters/" + id + "/fighter.json — боец рисуется заглушкой. Создай: node tools/sprites.mjs new " + id; return; }
   await Promise.all(STATES.filter(s => bank.has(s.id)).map(s => bank.load(s.id)));
   const have = STATES.filter(s => bank.has(s.id)).length, t1 = STATES.filter(s => s.tier === 1), t1ok = t1.filter(s => bank.has(s.id)).length;
-  $("sum").textContent = "Состояний: " + have + " из " + STATES.length + " · 1-й уровень (нужно для боя): " + t1ok + "/" + t1.length + " · клетка " + bank.man.cell + " px";
+  $("sum").textContent = "Состояний: " + have + " из " + STATES.length + " · 1-й уровень (нужно для боя): " + t1ok + "/" + t1.length + " · клетка " + bank.man.cell[0] + "×" + bank.man.cell[1] + " px";
   for (const [k, title] of Object.entries(CATEGORIES)) {
     const rows = STATES.filter(s => s.cat === k); if (!rows.length) continue;
     const h = document.createElement("h2"); h.textContent = title; const g = document.createElement("div"); g.className = "grid"; $("out").append(h, g);
     for (const s of rows) {
       const has = bank.has(s.id), card = document.createElement("div"); card.className = "card" + (has ? "" : " miss");
-      const cv = document.createElement("canvas"); cv.width = cv.height = bank.man.cell; card.append(cv);
+      const cv = document.createElement("canvas"); cv.width = bank.man.cell[0]; cv.height = bank.man.cell[1]; card.append(cv);
       const b = document.createElement("b"); b.textContent = s.id; const sm = document.createElement("small");
       sm.innerHTML = '<span class="t' + s.tier + '">ур.' + s.tier + "</span> · " + s.name + "<br>" + (has ? bank.man.states[s.id].frames + " кадр." : "нет → " + (s.fb.find(f => bank.has(f)) || "заглушка"));
       card.append(b, sm); g.append(card); cards.push({ s, cv, has });
@@ -50,13 +50,13 @@ async function show() {
 function tick(now) {
   const spd = Number($("spd").value), flip = $("flip").checked, guide = $("guide").checked;
   if (bank && bank.man) for (const c of cards) {
-    const g = c.cv.getContext("2d"), M = bank.man; g.clearRect(0, 0, M.cell, M.cell);
+    const g = c.cv.getContext("2d"), M = bank.man; g.clearRect(0, 0, M.cell[0], M.cell[1]);
     if (c.has && bank.imgs[c.s.id]) {
       const n = bank.frames(c.s.id), fps = effFps(c.s, n, M.states[c.s.id].fps); let ms = now * spd; if (!c.s.loop) ms %= n * 1000 / fps + 500; // одноразовые состояния повторяются с паузой
       const fi = frameIndex(c.s, n, ms, fps);
-      g.save(); if (flip) { g.translate(M.cell, 0); g.scale(-1, 1); } g.drawImage(bank.imgs[c.s.id], fi * M.cell, 0, M.cell, M.cell, 0, 0, M.cell, M.cell); g.restore();
+      g.save(); if (flip) { g.translate(M.cell[0], 0); g.scale(-1, 1); } g.drawImage(bank.imgs[c.s.id], fi * M.cell[0], 0, M.cell[0], M.cell[1], 0, 0, M.cell[0], M.cell[1]); g.restore();
     }
-    if (guide) { g.strokeStyle = "rgba(248,113,113,.7)"; g.beginPath(); g.moveTo(0, M.anchor[1] + .5); g.lineTo(M.cell, M.anchor[1] + .5); g.stroke(); g.strokeStyle = "rgba(125,211,252,.7)"; g.beginPath(); g.moveTo(M.anchor[0] + .5, M.anchor[1] - 12); g.lineTo(M.anchor[0] + .5, M.anchor[1] + 6); g.stroke(); }
+    if (guide) { g.strokeStyle = "rgba(248,113,113,.7)"; g.beginPath(); g.moveTo(0, M.anchor[1] + .5); g.lineTo(M.cell[0], M.anchor[1] + .5); g.stroke(); g.strokeStyle = "rgba(125,211,252,.7)"; g.beginPath(); g.moveTo(M.anchor[0] + .5, M.anchor[1] - 12); g.lineTo(M.anchor[0] + .5, M.anchor[1] + 6); g.stroke(); }
   }
   requestAnimationFrame(tick);
 }
