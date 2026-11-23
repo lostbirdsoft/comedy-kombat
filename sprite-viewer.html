@@ -23,43 +23,4 @@ button{cursor:pointer}.sum{color:#a3e635}.warn{color:#fca5a5}.muted{color:#9ca3a
   <label>швидкість <select id="spd"><option value="1">×1</option><option value="0.5">×0.5</option><option value="0">пауза</option></select></label>
 </div>
 <div id="sum" class="sum"></div><div id="msg" class="warn"></div><div id="out"></div>
-<script type="module">
-import { SpriteBank, STATES, CATEGORIES, STATE_BY_ID, frameIndex, effFps } from "./sprites.js?v=16";
-const $ = id => document.getElementById(id), q = new URLSearchParams(location.search);
-$("fid").value = q.get("f") || ""; let cards = [], bank = null;
-async function show() {
-  const id = $("fid").value.trim(); if (!id) return; history.replaceState(null, "", "?f=" + encodeURIComponent(id));
-  $("out").innerHTML = ""; $("msg").textContent = ""; $("sum").textContent = ""; cards = [];
-  bank = new SpriteBank(id, "img/fighters/", Date.now()); await bank.start();
-  if (!bank.man) { const is = bank.issues; $("msg").textContent = is && is.errors.length ? "fighter.json с ошибками: " + is.errors.join("; ") : "Нет img/fighters/" + id + "/fighter.json — боец рисуется заглушкой. Создай: node tools/sprites.mjs new " + id; return; }
-  await Promise.all(STATES.filter(s => bank.has(s.id)).map(s => bank.load(s.id)));
-  const have = STATES.filter(s => bank.has(s.id)).length, t1 = STATES.filter(s => s.tier === 1), t1ok = t1.filter(s => bank.has(s.id)).length;
-  $("sum").textContent = "Состояний: " + have + " из " + STATES.length + " · 1-й уровень (нужно для боя): " + t1ok + "/" + t1.length + " · клетка " + bank.man.cell[0] + "×" + bank.man.cell[1] + " px";
-  for (const [k, title] of Object.entries(CATEGORIES)) {
-    const rows = STATES.filter(s => s.cat === k); if (!rows.length) continue;
-    const h = document.createElement("h2"); h.textContent = title; const g = document.createElement("div"); g.className = "grid"; $("out").append(h, g);
-    for (const s of rows) {
-      const has = bank.has(s.id), card = document.createElement("div"); card.className = "card" + (has ? "" : " miss");
-      const cv = document.createElement("canvas"); cv.width = bank.man.cell[0]; cv.height = bank.man.cell[1]; card.append(cv);
-      const b = document.createElement("b"); b.textContent = s.id; const sm = document.createElement("small");
-      sm.innerHTML = '<span class="t' + s.tier + '">ур.' + s.tier + "</span> · " + s.name + "<br>" + (has ? bank.man.states[s.id].frames + " кадр." : "нет → " + (s.fb.find(f => bank.has(f)) || "заглушка"));
-      card.append(b, sm); g.append(card); cards.push({ s, cv, has });
-    }
-  }
-}
-function tick(now) {
-  const spd = Number($("spd").value), flip = $("flip").checked, guide = $("guide").checked;
-  if (bank && bank.man) for (const c of cards) {
-    const g = c.cv.getContext("2d"), M = bank.man; g.clearRect(0, 0, M.cell[0], M.cell[1]);
-    if (c.has && bank.imgs[c.s.id]) {
-      const n = bank.frames(c.s.id), fps = effFps(c.s, n, M.states[c.s.id].fps); let ms = now * spd; if (!c.s.loop) ms %= n * 1000 / fps + 500; // одноразовые состояния повторяются с паузой
-      const fi = frameIndex(c.s, n, ms, fps);
-      g.save(); if (flip) { g.translate(M.cell[0], 0); g.scale(-1, 1); } g.drawImage(bank.imgs[c.s.id], fi * M.cell[0], 0, M.cell[0], M.cell[1], 0, 0, M.cell[0], M.cell[1]); g.restore();
-    }
-    if (guide) { g.strokeStyle = "rgba(248,113,113,.7)"; g.beginPath(); g.moveTo(0, M.anchor[1] + .5); g.lineTo(M.cell[0], M.anchor[1] + .5); g.stroke(); g.strokeStyle = "rgba(125,211,252,.7)"; g.beginPath(); g.moveTo(M.anchor[0] + .5, M.anchor[1] - 12); g.lineTo(M.anchor[0] + .5, M.anchor[1] + 6); g.stroke(); }
-  }
-  requestAnimationFrame(tick);
-}
-$("go").onclick = show; $("fid").onkeydown = e => { if (e.key === "Enter") show(); };
-show(); requestAnimationFrame(tick);
-</script></body></html>
+<script type="module" src="sprite-viewer.js?v=47599964"></script></body></html>
