@@ -11,15 +11,16 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Comedy Kombat">
-  <link rel="stylesheet" href="style.css?v=8990512b">
+  <link rel="stylesheet" href="style.css?v=c1046ad6">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" src="app.js?v=097acc50"></script>
+  <script type="module" src="app.js?v=12cb3f4c"></script>
 </head>
 <body>
+  <canvas id="bgBlur" class="bgblur" width="96" height="54" aria-hidden="true"></canvas>
 <main class="app">
   <header class="topbar">
     <div><div class="eyebrow">LOSTBIRD SOFT</div><h1>COMEDY <span>KOMBAT</span></h1></div>
-    <div class="topright"><button id="menuBtn" class="mini ghost" hidden>☰ Меню</button><span class="room-tag" id="roomTag">МЕНЮ</span><button id="resignBtn" class="mini" hidden>Здатися</button><button id="gearBtn" class="mini ghost gear" aria-label="Налаштування">⚙️</button></div>
+    <div class="topright"><button id="menuBtn" class="mini ghost" hidden>☰ Меню</button><span class="room-tag" id="roomTag">МЕНЮ</span><button id="resignBtn" class="mini" hidden>Здатися</button><button id="helpBtn" class="mini ghost" aria-label="Клавіші керування" hidden>⌨</button><button id="fsBtn" class="mini ghost" aria-label="На весь екран" hidden>⛶</button><button id="gearBtn" class="mini ghost gear" aria-label="Налаштування">⚙️</button></div>
   </header>
 
   <p id="status" class="status" role="status">Підключаємось…</p>
@@ -109,6 +110,7 @@
 
   <section id="screenFight" class="screen" hidden>
     <div class="stage"><canvas id="game" width="900" height="500"></canvas>
+      <div id="keyHint" class="keyhint" aria-hidden="true"><b>A/D</b> рух · <b>W</b> стрибок · <b>S</b> присісти · <b>F</b>/<b>R</b> рука · <b>G</b>/<b>T</b> нога · <b>H</b> спец · <b>Shift</b> блок</div>
       <div id="result" class="result" hidden>
         <div class="res-title" id="resTitle"></div><div class="res-sub" id="resSub"></div>
         <button id="rematchBtn" class="big">РЕВАНШ</button>
@@ -132,7 +134,8 @@
         <button class="pb blk" data-hold="b"><i>C</i>🛡<small>БЛОК</small></button>
       </div>
     </div>
-    <p class="hint">ПК: A/D — рух, W — стрибок, S — присісти, Shift/B — блок (C) · F/R — рука X/Y, G/T — нога A/B, H — спец (Z)</p>
+    <p class="hint rotate">↻ Поверни телефон на бік: арена буде на весь екран, кнопки поверх неї</p>
+      <p class="hint kbdhint">ПК: A/D — рух, W — стрибок, S — присісти, Shift/B — блок (C) · F/R — рука X/Y, G/T — нога A/B, H — спец (Z)</p>
   </section>
 </main>
 
@@ -146,6 +149,15 @@
         <button data-v="buttons">⬅➡ Кнопки</button>
       </div>
       <div class="opt-note" id="ctrlNote"></div>
+    </div>
+    <div class="opt">
+      <div class="opt-title">Екранні кнопки в бою</div>
+      <div class="seg three" id="segBtns">
+        <button data-v="auto">Авто</button>
+        <button data-v="on">Завжди</button>
+        <button data-v="off">Ховати</button>
+      </div>
+      <div class="opt-note" id="btnsNote"></div>
     </div>
     <div class="opt row"><span>Звук</span><button class="tog" id="togSound"></button></div>
     <div class="opt row"><span>Вібрація при ударах</span><button class="tog" id="togHaptic"></button></div>
