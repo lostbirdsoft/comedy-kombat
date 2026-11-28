@@ -11,9 +11,9 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Comedy Kombat">
-  <link rel="stylesheet" href="style.css?v=08435a45">
+  <link rel="stylesheet" href="style.css?v=0500905d">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script type="module" src="app.js?v=54c4b431"></script>
+  <script type="module" src="app.js?v=fd7eddb6"></script>
 </head>
 <body>
   <canvas id="bgBlur" class="bgblur" width="96" height="54" aria-hidden="true"></canvas>
@@ -158,6 +158,12 @@
         <button data-v="off">Ховати</button>
       </div>
       <div class="opt-note" id="btnsNote"></div>
+    </div>
+    <div class="opt">
+      <div class="opt-title">Гучність</div>
+      <label class="vol"><span>🎵 Музика</span><input type="range" id="volMusic" min="0" max="100" step="5"></label>
+      <label class="vol"><span>💥 Ефекти</span><input type="range" id="volSfx" min="0" max="100" step="5"></label>
+      <label class="vol"><span>🗣 Голос</span><input type="range" id="volVoice" min="0" max="100" step="5"></label>
     </div>
     <div class="opt row"><span>Звук</span><button class="tog" id="togSound"></button></div>
     <div class="opt row"><span>Вібрація при ударах</span><button class="tog" id="togHaptic"></button></div>
